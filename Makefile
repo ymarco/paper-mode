@@ -5,7 +5,7 @@ CFLAGS += -lm
 
 # all : mupdf-module.so
 mupdf-gtk: mupdf-gtk.c
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ /usr/local/lib/libmupdf.a /usr/local/lib/libmupdf-third.a
 
 debug: CFLAGS += -DDEBUG -g
 debug: mupdf-module.so
