@@ -45,22 +45,14 @@ static void activate(GtkApplication *app, gpointer user_data) {
   gtk_window_set_default_size(GTK_WINDOW(window), 200, 200);
   Client *c = (Client *)user_data;
 
-  c->container = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
-  g_signal_connect(G_OBJECT(c->container), "destroy",
-                   G_CALLBACK(window_destroy), c);
+  c->container = gtk_drawing_area_new();
 
-  c->view = gtk_drawing_area_new();
+  gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(c->container));
 
-  gtk_container_add(GTK_CONTAINER(c->container), GTK_WIDGET(c->view));
+  g_signal_connect(G_OBJECT(c->container), "draw", G_CALLBACK(draw_callback),
+                   c);
 
-
-  gtk_widget_set_size_request (c->view, 100, 100);
-  g_signal_connect (G_OBJECT (c->view), "draw",
-                    G_CALLBACK (draw_callback), NULL);
-
-
-  gtk_widget_show_all(c->container);
   gtk_widget_show_all(window);
 }
 
