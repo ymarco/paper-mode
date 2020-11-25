@@ -23,7 +23,6 @@ typedef struct DocInfo {
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   int needs_rerender;
-  cairo_surface_t* image_surf;
   fz_colorspace *colorspace;
 } DocInfo;
 
