@@ -10,29 +10,37 @@ gboolean
 draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
 {
   guint width, height;
-  GdkRGBA color;
-  GtkStyleContext *context;
+  GtkStyleContext *style;
 
-  context = gtk_widget_get_style_context (widget);
+  style = gtk_widget_get_style_context(widget);
 
-  width = gtk_widget_get_allocated_width (widget);
-  height = gtk_widget_get_allocated_height (widget);
+  width = gtk_widget_get_allocated_width(widget);
+  height = gtk_widget_get_allocated_height(widget);
 
+  gtk_render_background(style, cr, 0, 0, width, height);
 
+  /* cairo_arc(cr, width / 2.0, height / 2.0, MIN(width, height) / 2.0, 0, */
+  /*           2 * G_PI); */
 
-  gtk_render_background (context, cr, 0, 0, width, height);
+  /* gtk_style_context_get_color(style, gtk_style_context_get_state(style), */
+  /*                             &color); */
+  /* gdk_cairo_set_source_rgba(cr, &color); */
 
-  cairo_arc (cr,
-             width / 2.0, height / 2.0,
-             MIN (width, height) / 2.0,
-             0, 2 * G_PI);
+  /* cairo_fill(cr); */
+  cairo_surface_t *sur =
+      cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+  {
+    cairo_t *crr = cairo_create(sur);
+    cairo_set_line_width(crr, 0.1);
+    cairo_set_source_rgb(crr, 0.2, 0.5, 0);
+    cairo_rectangle(crr, 0.25, 0.25, 20, 20);
+    cairo_fill(crr);
+    cairo_stroke(crr);
+    cairo_destroy(crr);
+  }
 
-  gtk_style_context_get_color (context,
-                               gtk_style_context_get_state (context),
-                               &color);
-  gdk_cairo_set_source_rgba (cr, &color);
-
-  cairo_fill (cr);
+  cairo_set_source_surface(cr, sur, 0, 0);
+  cairo_paint(cr);
 
  return FALSE;
 }
