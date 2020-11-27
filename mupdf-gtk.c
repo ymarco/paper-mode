@@ -8,16 +8,6 @@
 
 static fz_context *ctx;
 
-/*
- * Update draw_page_ctm and draw_page_bounds from page_bounds and rotate.
- */
-void transform_page(DocInfo *doci) {
-  doci->draw_page_ctm =
-      fz_transform_page(doci->page_bounds, doci->zoom, doci->rotate);
-  doci->draw_page_bounds =
-      fz_transform_rect(doci->page_bounds, doci->draw_page_ctm);
-}
-
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   Client *c = (Client *)data;
 
@@ -130,22 +120,27 @@ void init_doc(DocInfo *doci, char *filename, char *accel_filename) {
   fz_location loc = {0, 0};
   doci->location = loc;
   doci->colorspace = fz_device_rgb(ctx);
+  doci->zoom = 100.0f;
 }
 
 void load_page(DocInfo *doci, fz_location location) {
 
+  doci->location = location;
+
   fz_drop_stext_page(ctx, doci->page_text);
-  doci->page_text = NULL;
+  doci->page_text = fz_new_stext_page_from_page(ctx, doci->page, NULL);
   fz_drop_separations(ctx, doci->seps);
   doci->seps = NULL;
   fz_drop_link(ctx, doci->links);
-  doci->links = NULL;
+  doci->links = fz_load_links(ctx, doci->page);
   fz_drop_page(ctx, doci->page);
-  doci->page = NULL;
-  doci->location = location;
-
   doci->page = fz_load_chapter_page(ctx, doci->doc, doci->location.chapter,
                                     doci->location.page);
+  doci->page_bounds = fz_bound_page(ctx, doci->page);
+  doci->draw_page_ctm =
+      fz_transform_page(doci->page_bounds, doci->zoom, doci->rotate);
+  doci->draw_page_bounds =
+      fz_transform_rect(doci->page_bounds, doci->draw_page_ctm);
 }
 
 int main(int argc, char **argv) {
