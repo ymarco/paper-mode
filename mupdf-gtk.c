@@ -11,69 +11,36 @@ static fz_context *ctx;
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   Client *c = (Client *)data;
 
-  guint width, height;
-  GdkRGBA color;
-  GtkStyleContext *context;
-  context = gtk_widget_get_style_context(widget);
-  width = gtk_widget_get_allocated_width(widget);
-  height = gtk_widget_get_allocated_height(widget);
-  gtk_render_background(context, cr, 0, 0, width, height);
-  cairo_arc(cr, width / 2.0, height / 2.0, MIN(width, height) / 2.0, 0,
-            2 * G_PI);
-  gtk_style_context_get_color(context, gtk_style_context_get_state(context),
-                              &color);
-  gdk_cairo_set_source_rgba(cr, &color);
-  cairo_fill(cr);
+  cairo_surface_t *surface = c->doci->image_surf;
 
-  cairo_surface_t *surface = cairo_get_target(cr);
-
-  if (surface == NULL ||
-      cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS ||
-      cairo_surface_get_type(surface) != CAIRO_SURFACE_TYPE_IMAGE) {
-
-    fprintf(stderr, "wrong surface type: %d, should be 0 for image.\n",
-            cairo_surface_get_type(surface));
-    exit(EXIT_FAILURE); // TODO
-  }
-
-  unsigned int surface_width = cairo_image_surface_get_width(surface);
-  unsigned int surface_height = cairo_image_surface_get_height(surface);
+  unsigned int width = cairo_image_surface_get_width(surface);
+  unsigned int height = cairo_image_surface_get_height(surface);
 
   unsigned char *image = cairo_image_surface_get_data(surface);
-  // randomly set some pixels to see if it does anything
-  for (int i = 0; i < 500; i++) {
-    image[i] = 128;
-  }
-  return FALSE;
 
-  fz_irect irect = {.x1 = surface_width, .y1 = surface_height};
-  fz_rect rect = {.x1 = surface_width, .y1 = surface_height};
-
-  fz_display_list *display_list = fz_new_display_list(ctx, rect);
-  fz_device *list_device = fz_new_list_device(ctx, display_list);
-
-  /* fz_try(ctx) { */
-  transform_page(c->doci);
-  fz_run_page(ctx, c->doci->page, list_device, c->doci->draw_page_ctm, NULL);
-  /* } */
-  /* fz_catch(ctx) { return ZATHURA_ERROR_UNKNOWN; } */
-
-  fz_close_device(ctx, list_device);
-  fz_drop_device(ctx, list_device);
+  fz_irect whole_rect = {.x1 = width, .y1 = height};
 
   fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
-      ctx, c->doci->colorspace, irect, c->doci->seps, 1, image);
+      ctx, c->doci->colorspace, whole_rect, NULL, 1, image);
   fz_clear_pixmap_with_value(ctx, pixmap, 0xFF);
 
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
-  fz_run_display_list(ctx, display_list, draw_device, fz_identity, rect, NULL);
+  fz_run_page(ctx, c->doci->page, draw_device, c->doci->draw_page_ctm, NULL);
+
   fz_close_device(ctx, draw_device);
   fz_drop_device(ctx, draw_device);
-
   fz_drop_pixmap(ctx, pixmap);
-  fz_drop_display_list(ctx, display_list);
+  cairo_set_source_surface(cr, surface, 0, 0);
+  cairo_paint(cr);
 
   return FALSE;
+}
+
+static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation,
+                            Client *c) {
+  cairo_surface_destroy(c->doci->image_surf);
+  c->doci->image_surf = cairo_image_surface_create(
+      CAIRO_FORMAT_RGB24, allocation->width, allocation->height);
 }
 
 static void activate(GtkApplication *app, gpointer user_data) {
@@ -81,7 +48,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
   window = gtk_application_window_new(app);
   gtk_window_set_title(GTK_WINDOW(window), "Window");
-  gtk_window_set_default_size(GTK_WINDOW(window), 200, 200);
+  gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
   Client *c = (Client *)user_data;
 
   c->container = gtk_drawing_area_new();
@@ -90,10 +57,12 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
   g_signal_connect(G_OBJECT(c->container), "draw", G_CALLBACK(draw_callback),
                    c);
+  g_signal_connect(G_OBJECT(c->container), "size-allocate",
+                   G_CALLBACK(allocate_pixmap), c);
   gtk_widget_show_all(window);
 }
 
-void init_doc(DocInfo *doci, char *filename, char *accel_filename) {
+void load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // zero it all out - the short way of setting everything to NULL.
   memset(doci, 0, sizeof(*doci));
   strcpy(doci->filename, filename);
@@ -159,7 +128,7 @@ int main(int argc, char **argv) {
   DocInfo _doci;
   DocInfo *doci = &_doci;
   // TODO accel logic
-  init_doc(doci, "./cancel.pdf", NULL);
+  load_doc(doci, "./cancel.pdf", NULL);
   fz_location loc = {0, 0};
   fz_try(ctx) { load_page(doci, loc); }
   fz_catch(ctx) {

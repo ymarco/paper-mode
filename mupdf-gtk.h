@@ -24,6 +24,7 @@ typedef struct DocInfo {
   char accel[PATH_MAX];
   int needs_rerender;
   fz_colorspace *colorspace;
+  cairo_surface_t *image_surf;
 } DocInfo;
 
 typedef struct Client {
