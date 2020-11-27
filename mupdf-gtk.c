@@ -11,13 +11,11 @@ static fz_context *ctx;
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   Client *c = (Client *)data;
 
-  cairo_surface_t *surface = c->doci->image_surf;
-
-  unsigned int width = cairo_image_surface_get_width(surface);
-  unsigned int height = cairo_image_surface_get_height(surface);
-
-  unsigned char *image = cairo_image_surface_get_data(surface);
-
+  GdkPixbuf *pixbuf = gtk_image_get_pixbuf((GtkImage *)widget);
+  unsigned int width = gdk_pixbuf_get_width(pixbuf);
+  unsigned int height = gdk_pixbuf_get_height(pixbuf);
+  fprintf(stderr, "w: %d, h: %d\n", width, height);
+  unsigned char *image = gdk_pixbuf_get_pixels(pixbuf);
   fz_irect whole_rect = {.x1 = width, .y1 = height};
 
   fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
@@ -30,17 +28,8 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   fz_close_device(ctx, draw_device);
   fz_drop_device(ctx, draw_device);
   fz_drop_pixmap(ctx, pixmap);
-  cairo_set_source_surface(cr, surface, 0, 0);
-  cairo_paint(cr);
 
   return FALSE;
-}
-
-static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation,
-                            Client *c) {
-  cairo_surface_destroy(c->doci->image_surf);
-  c->doci->image_surf = cairo_image_surface_create(
-      CAIRO_FORMAT_RGB24, allocation->width, allocation->height);
 }
 
 static void activate(GtkApplication *app, gpointer user_data) {
@@ -51,14 +40,13 @@ static void activate(GtkApplication *app, gpointer user_data) {
   gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
   Client *c = (Client *)user_data;
 
-  c->container = gtk_drawing_area_new();
+  c->container = gtk_image_new_from_pixbuf(
+      gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 32, 200, 200));
 
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(c->container));
 
   g_signal_connect(G_OBJECT(c->container), "draw", G_CALLBACK(draw_callback),
                    c);
-  g_signal_connect(G_OBJECT(c->container), "size-allocate",
-                   G_CALLBACK(allocate_pixmap), c);
   gtk_widget_show_all(window);
 }
 
