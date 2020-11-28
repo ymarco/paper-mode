@@ -8,6 +8,34 @@
 
 static fz_context *ctx;
 
+void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
+  if (doci->pages[chapter])
+    return;
+  doci->page_count_for_chapter[chapter] =
+      fz_count_chapter_pages(ctx, doci->doc, chapter);
+  doci->pages[chapter] =
+      calloc(sizeof(Page), doci->page_count_for_chapter[chapter]);
+}
+
+void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
+  ensure_chapter_is_loaded(doci, location.chapter);
+  Page *page = &doci->pages[location.chapter][location.page];
+  if (page)
+    return;
+  page->page =
+      fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
+  page->page_text = fz_new_stext_page_from_page(ctx, page->page, NULL);
+  page->seps = NULL; // TODO seps
+  page->links = fz_load_links(ctx, page->page);
+  page->page_bounds = fz_bound_page(ctx, page->page);
+  page->display_list = fz_new_display_list(ctx, page->page_bounds);
+  // populate display_list
+  fz_device *device = fz_new_list_device(ctx, page->display_list);
+  fz_run_page(ctx, page->page, device, fz_identity, NULL);
+  fz_close_device(ctx, device);
+  fz_drop_device(ctx, device);
+}
+
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   cairo_surface_t *surface = c->image_surf;
@@ -155,33 +183,6 @@ void drop_page(Page *page) {
   memset(page, 0, sizeof(*page));
 }
 
-void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
-  if (doci->pages[chapter])
-    return;
-  doci->page_count_for_chapter[chapter] =
-      fz_count_chapter_pages(ctx, doci->doc, chapter);
-  doci->pages[chapter] =
-      calloc(sizeof(Page), doci->page_count_for_chapter[chapter]);
-}
-
-void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
-  ensure_chapter_is_loaded(doci, location.chapter);
-  Page *page = &doci->pages[location.chapter][location.page];
-  if (page)
-    return;
-  page->page =
-      fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
-  page->page_text = fz_new_stext_page_from_page(ctx, page->page, NULL);
-  page->seps = NULL; // TODO seps
-  page->links = fz_load_links(ctx, page->page);
-  page->page_bounds = fz_bound_page(ctx, page->page);
-  page->display_list = fz_new_display_list(ctx, page->page_bounds);
-  // populate display_list
-  fz_device *device = fz_new_list_device(ctx, page->display_list);
-  fz_run_page(ctx, page->page, device, fz_identity, NULL);
-  fz_close_device(ctx, device);
-  fz_drop_device(ctx, device);
-}
 
 int main(int argc, char **argv) {
   ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
