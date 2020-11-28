@@ -42,9 +42,7 @@ typedef struct Client {
   DocInfo *doci;
   int fd;
   cairo_surface_t *image_surf;
-  double mouse_event_x;
-  double mouse_event_y;
-  guint mouse_event_button;
+  GdkEventButton mouse_event;
   gboolean has_mouse_event;
 } Client;
 

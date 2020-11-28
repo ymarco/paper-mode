@@ -45,7 +45,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     GdkRGBA color;
     GtkStyleContext *style = gtk_widget_get_style_context(widget);
     gtk_render_background(style, cr, 0, 0, width, height);
-    cairo_arc(cr, c->mouse_event_x, c->mouse_event_y, 20.0, 0, 2 * G_PI);
+    cairo_arc(cr, c->mouse_event.x, c->mouse_event.y, 20.0, 0, 2 * G_PI);
     gtk_style_context_get_color(style, gtk_style_context_get_state(style),
                                 &color);
     gdk_cairo_set_source_rgba(cr, &color);
@@ -64,10 +64,9 @@ static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation,
 
 static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event,
                                    Client *c) {
-  c->mouse_event_x = event->x;
-  c->mouse_event_y = event->y;
-  c->mouse_event_button = event->button;
+  c->mouse_event = *event;
   c->has_mouse_event = TRUE;
+  fprintf(stderr, "Mouse event: %d, type: %d\n", event->button, event->type);
   gtk_widget_queue_draw(widget);
   return FALSE;
 }
