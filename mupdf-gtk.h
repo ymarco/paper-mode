@@ -10,11 +10,11 @@ typedef struct Page {
   fz_matrix draw_page_ctm, // zoom, rotation, no screen x,y
       view_page_ctm,       // with screen x,y
       view_page_inv_ctm;
-  fz_rect page_bounds, draw_page_bounds, view_page_bounds;
+  fz_rect page_bounds;
   fz_location location;
   fz_separations *seps;
   fz_link *links;
-  fz_display_list* display_list;
+  fz_display_list *display_list;
 } Page;
 
 typedef struct DocInfo {
@@ -23,13 +23,17 @@ typedef struct DocInfo {
   fz_outline *outline;
   pdf_document *pdf;
   pdf_annot *selected_annot;
-  float zoom, rotate;
-  Page **pages; // pages[chapter_num][page_num]
+  float zoom; // in precentage
+  float rotate; // in degrees
+  /* pages[location.chapter][location.page] = page */
+  Page **pages;
+  /* 0 <= scroll <= pages[location.chapter][location.page].page_bounds.y1 */
+  float scroll_x;
+  float scroll_y;
   int chapter_count;
   int *page_count_for_chapter;
   char filename[PATH_MAX];
   char accel[PATH_MAX];
-  int needs_rerender;
   fz_colorspace *colorspace;
 } DocInfo;
 

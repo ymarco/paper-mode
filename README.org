@@ -7,7 +7,8 @@ Currently I'm developing the viewer as a separate executable that opens a gtk
 window. Once I have mouse controls and things stabilize I'll embed it into Emacs.
 
 * TODO list
-- [ ] Ensure zoom & rotation work
+- [X] Ensure zoom & rotation work
+- [X] Scroll
 - [ ] Center pages
 - [ ] Show more than one page at a time
 - [ ] Links:
