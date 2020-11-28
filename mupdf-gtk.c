@@ -20,7 +20,7 @@ void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
 void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
   ensure_chapter_is_loaded(doci, location.chapter);
   Page *page = &doci->pages[location.chapter][location.page];
-  if (page)
+  if (page->page)
     return;
   page->page =
       fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
