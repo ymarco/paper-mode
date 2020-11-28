@@ -26,7 +26,8 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
   fz_location *loc = &c->doci->location;
   Page *page = &c->doci->pages[loc->chapter][loc->page];
-  fz_run_page(ctx, page->page, draw_device, page->draw_page_ctm, NULL);
+  fz_run_display_list(ctx, page->display_list, draw_device, page->draw_page_ctm,
+                      page->page_bounds, NULL);
 
   fz_close_device(ctx, draw_device);
   fz_drop_device(ctx, draw_device);
@@ -166,6 +167,11 @@ void load_page(DocInfo *doci, fz_location location) {
   page->links = fz_load_links(ctx, page->page);
   page->page_bounds = fz_bound_page(ctx, page->page);
   page->display_list = fz_new_display_list(ctx, page->page_bounds);
+  // populate display_list
+  fz_device *device = fz_new_list_device(ctx, page->display_list);
+  fz_run_page(ctx, page->page, device, fz_identity, NULL);
+  fz_close_device(ctx, device);
+  fz_drop_device(ctx, device);
   page->draw_page_ctm =
       fz_transform_page(page->page_bounds, doci->zoom, doci->rotate);
   page->draw_page_bounds =
