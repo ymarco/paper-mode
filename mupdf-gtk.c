@@ -25,6 +25,14 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
   fz_location *loc = &c->doci->location;
+  fz_try(ctx) { ensure_page_is_loaded(c->doci, *loc); }
+  fz_catch(ctx) {
+    fprintf(stderr, "can't load page");
+    exit(EXIT_FAILURE);
+  }
+  fprintf(stderr, "chapters: %d, chap %d pages: %d\n", c->doci->chapter_count,
+          loc->chapter, c->doci->page_count_for_chapter[loc->chapter]);
+
   Page *page = &c->doci->pages[loc->chapter][loc->page];
 
   fz_matrix draw_page_ctm =
@@ -147,22 +155,20 @@ void drop_page(Page *page) {
   memset(page, 0, sizeof(*page));
 }
 
-void load_page(DocInfo *doci, fz_location location) {
+void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
+  if (doci->pages[chapter])
+    return;
+  doci->page_count_for_chapter[chapter] =
+      fz_count_chapter_pages(ctx, doci->doc, chapter);
+  doci->pages[chapter] =
+      calloc(sizeof(Page), doci->page_count_for_chapter[chapter]);
+}
 
-  doci->location = location;
-  Page *chapter_pages = doci->pages[location.chapter];
-  Page *page;
-
-  if (!chapter_pages) {
-    doci->page_count_for_chapter[location.chapter] =
-        fz_count_chapter_pages(ctx, doci->doc, location.chapter);
-    chapter_pages = doci->pages[location.chapter] = calloc(
-        sizeof(Page), doci->page_count_for_chapter[doci->location.chapter]);
-    page = &chapter_pages[location.page];
-  } else if ((page = &chapter_pages[location.page])) {
-    drop_page(page);
-  }
-
+void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
+  ensure_chapter_is_loaded(doci, location.chapter);
+  Page *page = &doci->pages[location.chapter][location.page];
+  if (page)
+    return;
   page->page =
       fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
   page->page_text = fz_new_stext_page_from_page(ctx, page->page, NULL);
@@ -195,14 +201,7 @@ int main(int argc, char **argv) {
   // TODO accel logic
   load_doc(doci, "./amsmath.pdf", NULL);
   fz_location loc = {0, 1};
-  fz_try(ctx) { load_page(doci, loc); }
-  fz_catch(ctx) {
-    fprintf(stderr, "can't load page");
-    exit(EXIT_FAILURE);
-  }
-  fprintf(stderr, "chapters: %d, chap %d pages: %d\n", doci->chapter_count,
-          loc.chapter, doci->page_count_for_chapter[loc.chapter]);
-
+  doci->location = loc;
   app = gtk_application_new("org.gtk.example", G_APPLICATION_FLAGS_NONE);
   Client client;
   Client *c = &client;
