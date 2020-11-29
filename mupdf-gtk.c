@@ -36,6 +36,11 @@ void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
   fz_drop_device(ctx, device);
 }
 
+Page *get_page(DocInfo *doci, fz_location loc) {
+  ensure_page_is_loaded(doci, loc);
+  return &doci->pages[loc.chapter][loc.page];
+}
+
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   cairo_surface_t *surface = c->image_surf;
@@ -52,23 +57,35 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
   fz_clear_pixmap_with_value(ctx, pixmap, 0xFF);
 
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
-  fz_location *loc = &c->doci->location;
-  fz_try(ctx) { ensure_page_is_loaded(c->doci, *loc); }
+  fz_location loc = c->doci->location;
+  fz_try(ctx) { ensure_page_is_loaded(c->doci, loc); }
   fz_catch(ctx) {
     fprintf(stderr, "can't load page");
     exit(EXIT_FAILURE);
   }
-  fprintf(stderr, "chapters: %d, chap %d pages: %d\n", c->doci->chapter_count,
-          loc->chapter, c->doci->page_count_for_chapter[loc->chapter]);
 
-  Page *page = &c->doci->pages[loc->chapter][loc->page];
+  float stopped_y = c->doci->scroll_y;
+  Page *page = &c->doci->pages[loc.chapter][loc.page];
+  while (stopped_y < height) {
+    fz_matrix scale_ctm =
+        fz_transform_page(page->page_bounds, c->doci->zoom, c->doci->rotate);
+    fz_matrix draw_page_ctm =
+        fz_concat(scale_ctm, fz_translate(c->doci->scroll_x, stopped_y));
+    fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
+                        page->page_bounds, NULL);
 
-  fz_matrix draw_page_ctm =
-    fz_concat(
-      fz_translate(c->doci->scroll_x, c->doci->scroll_y),
-      fz_transform_page(page->page_bounds, c->doci->zoom, c->doci->rotate));
-  fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
-                      page->page_bounds, NULL);
+    float margin = 10;
+    stopped_y += fz_transform_rect(page->page_bounds, scale_ctm).y1 + margin;
+    fz_location next = fz_next_page(ctx, c->doci->doc, loc);
+    if (next.chapter == loc.chapter && next.page == loc.page) {
+      // end of document
+      break;
+    } else {
+      loc = next;
+    }
+    page = get_page(c->doci, loc);
+  }
+
   fz_close_device(ctx, draw_device);
   fz_drop_device(ctx, draw_device);
   fz_drop_pixmap(ctx, pixmap);
