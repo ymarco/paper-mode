@@ -13,7 +13,7 @@ window. Once I have mouse controls and things stabilize I'll embed it into Emacs
   + [ ] Sensible page dimensions by default:
     Center with a fixed width if the window is too long, fit to width if
     sensible, calculate minimum width with ~fz_new_bbox_device~ if too small.
-  + [ ] Show more than one page at a time
+  + [-] Show more than one page at a time
   + [ ] Mouse:
     - [ ] Smooth scrolling like Evince has
     - [ ] Select text

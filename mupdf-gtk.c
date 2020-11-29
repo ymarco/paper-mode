@@ -1,3 +1,4 @@
+#include <math.h>
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h> /* for pdf specifics and forms */
 #include <mupdf/ucdn.h>
@@ -64,8 +65,11 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     exit(EXIT_FAILURE);
   }
 
-  float stopped_y = c->doci->scroll_y;
   Page *page = &c->doci->pages[loc.chapter][loc.page];
+  fz_matrix scale_ctm =
+      fz_transform_page(page->page_bounds, c->doci->zoom, c->doci->rotate);
+  float stopped_y =
+      fz_transform_point(fz_make_point(0, -c->doci->scroll_y), scale_ctm).y;
   while (stopped_y < height) {
     fz_matrix scale_ctm =
         fz_transform_page(page->page_bounds, c->doci->zoom, c->doci->rotate);
@@ -74,8 +78,9 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
 
-    float margin = 10;
-    stopped_y += fz_transform_rect(page->page_bounds, scale_ctm).y1 + margin;
+    stopped_y += fz_transform_rect(page->page_bounds, scale_ctm).y1;
+    fprintf(stderr, "\rscroll_y: %3.0f, stopped_y: %3.0f", c->doci->scroll_y,
+            stopped_y);
     fz_location next = fz_next_page(ctx, c->doci->doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
       // end of document
@@ -124,11 +129,20 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event,
   return FALSE;
 }
 
-static void scroll(DocInfo *doci, float delta_x, float delta_y){
+static void scroll(DocInfo *doci, float delta_x, float delta_y) {
   // TODO don't let scroll_x get out of the page
-  // TODO turn pages if scroll_y is past the boundly
   doci->scroll_x += delta_x;
   doci->scroll_y += delta_y;
+  // move to next pages if scroll_y is past the page bound
+  while (doci->scroll_y >= get_page(doci, doci->location)->page_bounds.y1) {
+    doci->scroll_y -= get_page(doci, doci->location)->page_bounds.y1;
+    doci->location = fz_next_page(ctx, doci->doc, doci->location);
+  }
+  // move to previous pages if scroll_y is negative
+  while (doci->scroll_y < 0) {
+    doci->location = fz_previous_page(ctx, doci->doc, doci->location);
+    doci->scroll_y += get_page(doci, doci->location)->page_bounds.y1;
+  }
 }
 
 static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
@@ -137,28 +151,42 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
     fprintf(stderr, "Scroll handler called on something that isn't scroll.\n");
     return TRUE;
   }
-  // TODO check state and zoom for ctrl+scroll
   float d_x = 0.0f, d_y = 0.0f;
-  switch (event->direction) {
-  case GDK_SCROLL_UP:
-    d_y = 30;
-    break;
-  case GDK_SCROLL_DOWN:
-    d_y = -30;
-    break;
-  case GDK_SCROLL_LEFT:
-    d_x = 30;
-    break;
-  case GDK_SCROLL_RIGHT:
-    d_x = -30;
-    break;
-  case GDK_SCROLL_SMOOTH:
-    d_x = event->delta_x;
-    d_y = event->delta_y;
-    fprintf(stderr, "Smooth scroll\n");
-    break;
+  if (event->state & GDK_CONTROL_MASK) { // zoom
+    switch (event->direction) {
+    case GDK_SCROLL_UP:
+      d_y = 10;
+      break;
+    case GDK_SCROLL_DOWN:
+      d_y = -10;
+      break;
+    default:
+      fprintf(stderr, "unhandled zoom scroll case\n");
+    }
+    c->doci->zoom += d_y;
+  } else { // scroll
+    // TODO check state and zoom for ctrl+scroll
+    switch (event->direction) {
+    case GDK_SCROLL_UP:
+      d_y = -50;
+      break;
+    case GDK_SCROLL_DOWN:
+      d_y = 50;
+      break;
+    case GDK_SCROLL_LEFT:
+      d_x = -50;
+      break;
+    case GDK_SCROLL_RIGHT:
+      d_x = 50;
+      break;
+    case GDK_SCROLL_SMOOTH:
+      d_x = event->delta_x;
+      d_y = event->delta_y;
+      fprintf(stderr, "Smooth scroll\n");
+      break;
+    }
+    scroll(c->doci, d_x, d_y);
   }
-  scroll(c->doci, d_x, d_y);
   gtk_widget_queue_draw(widget);
   return FALSE;
 }
@@ -247,7 +275,6 @@ void drop_page(Page *page) {
   memset(page, 0, sizeof(*page));
 }
 
-
 int main(int argc, char **argv) {
   ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
   GtkApplication *app;
@@ -267,6 +294,11 @@ int main(int argc, char **argv) {
   load_doc(doci, "./amsmath.pdf", NULL);
   fz_location loc = {0, 1};
   doci->location = loc;
+  doci->zoom = 50.0f;
+  /* doci->scroll_y = -get_page(doci, doci->location)->page_bounds.y1 / 2; */
+  fprintf(stderr, "bounds: w %f, h %f\n",
+          get_page(doci, doci->location)->page_bounds.x1,
+          get_page(doci, doci->location)->page_bounds.y1);
   app = gtk_application_new("org.gtk.example", G_APPLICATION_FLAGS_NONE);
   Client client;
   Client *c = &client;
