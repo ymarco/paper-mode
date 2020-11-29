@@ -102,7 +102,46 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event,
                                    Client *c) {
   c->mouse_event = *event;
   c->has_mouse_event = TRUE;
-  fprintf(stderr, "Mouse event: %d, type: %d\n", event->button, event->type);
+  fprintf(stderr, "Mouse button: %d, type: %d\n", event->button, event->type);
+  gtk_widget_queue_draw(widget);
+  return FALSE;
+}
+
+static void scroll(DocInfo *doci, float delta_x, float delta_y){
+  // TODO don't let scroll_x get out of the page
+  // TODO turn pages if scroll_y is past the boundly
+  doci->scroll_x += delta_x;
+  doci->scroll_y += delta_y;
+}
+
+static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
+                             Client *c) {
+  if (event->type != GDK_SCROLL) {
+    fprintf(stderr, "Scroll handler called on something that isn't scroll.\n");
+    return TRUE;
+  }
+  // TODO check state and zoom for ctrl+scroll
+  float d_x = 0.0f, d_y = 0.0f;
+  switch (event->direction) {
+  case GDK_SCROLL_UP:
+    d_y = 30;
+    break;
+  case GDK_SCROLL_DOWN:
+    d_y = -30;
+    break;
+  case GDK_SCROLL_LEFT:
+    d_x = 30;
+    break;
+  case GDK_SCROLL_RIGHT:
+    d_x = -30;
+    break;
+  case GDK_SCROLL_SMOOTH:
+    d_x = event->delta_x;
+    d_y = event->delta_y;
+    fprintf(stderr, "Smooth scroll\n");
+    break;
+  }
+  scroll(c->doci, d_x, d_y);
   gtk_widget_queue_draw(widget);
   return FALSE;
 }
@@ -124,14 +163,22 @@ static void activate(GtkApplication *app, gpointer user_data) {
   g_signal_connect(G_OBJECT(c->container), "size-allocate",
                    G_CALLBACK(allocate_pixmap), c);
   // handle mouse hover and click
+
+  // TODO when I also add GDK_SMOOTH_SCROLL_MASK all scroll events turn to
+  // smooth ones with deltas of 0, I don't know how to find the direction in
+  // those cases
   gtk_widget_add_events(c->container,
                         GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
-                            GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK |
-                            GDK_POINTER_MOTION_HINT_MASK);
+                            GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
+                            GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
+                            GDK_POINTER_MOTION_MASK |
+                            GDK_POINTER_MOTION_HINT_MASK | GDK_SCROLL_MASK);
   /* gtk_signal_connect(GTK_OBJECT(c->container), "motion_notify_event", */
   /*                    (GtkSignalFunc)motion_notify_event, c); */
-  g_signal_connect(G_OBJECT(c->container), "button_press_event",
+  g_signal_connect(G_OBJECT(c->container), "button-release-event",
                    G_CALLBACK(button_press_event), c);
+  g_signal_connect(G_OBJECT(c->container), "scroll-event",
+                   G_CALLBACK(scroll_event), c);
 
   gtk_widget_show_all(window);
 }
