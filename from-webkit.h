@@ -1,3 +1,6 @@
+#ifndef __FROM_WEBKIT_H_
+#define __FROM_WEBKIT_H_
+
 #include "paper-gtk.h"
 #include <gtk/gtk.h>
 
@@ -48,3 +51,5 @@ window_destroy (GtkWidget *window, Client *c)
   c->container = NULL;
   send_to_lisp (c, "webkit--close", "");
 }
+
+#endif // __FROM_WEBKIT_H_
