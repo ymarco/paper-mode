@@ -55,7 +55,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
       ctx, c->doci->colorspace, whole_rect, NULL, 1, image);
-  fz_clear_pixmap_with_value(ctx, pixmap, 0xFF);
+  fz_clear_pixmap_with_value(ctx, pixmap, 0xF0);
 
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
   fz_location loc = c->doci->location;
@@ -75,10 +75,14 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
         fz_transform_page(page->page_bounds, c->doci->zoom, c->doci->rotate);
     fz_matrix draw_page_ctm =
         fz_concat(scale_ctm, fz_translate(c->doci->scroll_x, stopped_y));
+    fz_clear_pixmap_rect_with_value(
+        ctx, pixmap, 0xFF,
+        fz_round_rect(fz_transform_rect(page->page_bounds, draw_page_ctm)));
+    /* fz_run_page(ctx, page->page, draw_device, draw_page_ctm, &cookie); */
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
-
-    stopped_y += fz_transform_rect(page->page_bounds, scale_ctm).y1;
+    int margin = 20;
+    stopped_y += fz_transform_rect(page->page_bounds, scale_ctm).y1 + margin;
     fprintf(stderr, "\rscroll_y: %3.0f, stopped_y: %3.0f", c->doci->scroll_y,
             stopped_y);
     fz_location next = fz_next_page(ctx, c->doci->doc, loc);
