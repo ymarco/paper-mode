@@ -42,6 +42,10 @@ Page *get_page(DocInfo *doci, fz_location loc) {
   return &doci->pages[loc.chapter][loc.page];
 }
 
+fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
+  return fz_transform_page(page->page_bounds, doci->zoom, doci->rotate);
+}
+
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   cairo_surface_t *surface = c->image_surf;
@@ -66,13 +70,11 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
   }
 
   Page *page = &c->doci->pages[loc.chapter][loc.page];
-  fz_matrix scale_ctm =
-      fz_transform_page(page->page_bounds, c->doci->zoom, c->doci->rotate);
+  fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
   float stopped_y =
       fz_transform_point(fz_make_point(0, -c->doci->scroll_y), scale_ctm).y;
   while (stopped_y < height) {
-    fz_matrix scale_ctm =
-        fz_transform_page(page->page_bounds, c->doci->zoom, c->doci->rotate);
+    fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
     fz_matrix draw_page_ctm =
         fz_concat(scale_ctm, fz_translate(c->doci->scroll_x, stopped_y));
     fz_clear_pixmap_rect_with_value(
