@@ -46,6 +46,18 @@ fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
   return fz_transform_page(page->page_bounds, doci->zoom, doci->rotate);
 }
 
+/*
+ * Set scroll_x so the current page is centered.
+ */
+static void center_page(int surface_width, DocInfo *doci) {
+  Page *page = get_page(doci, doci->location);
+  fz_matrix scale_ctm = get_scale_ctm(doci, page);
+  fz_irect scaled_bounds =
+      fz_round_rect(fz_transform_rect(page->page_bounds, scale_ctm));
+  doci->scroll_x =
+      ((double)(surface_width - (int)fz_irect_width(scaled_bounds))) / 2;
+}
+
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   cairo_surface_t *surface = c->image_surf;
@@ -57,8 +69,14 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   fz_irect whole_rect = {.x1 = width, .y1 = height};
 
+  if (c->has_mouse_event && c->mouse_event.button == 2) {
+    center_page(width, c->doci);
+    fprintf(stderr, "centering!\n");
+  }
+
   fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
       ctx, c->doci->colorspace, whole_rect, NULL, 1, image);
+  // background
   fz_clear_pixmap_with_value(ctx, pixmap, 0xF0);
 
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
