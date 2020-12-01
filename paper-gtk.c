@@ -95,6 +95,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
     fz_matrix draw_page_ctm =
         fz_concat(scale_ctm, fz_translate(c->doci->scroll_x, stopped_y));
+    // foreground around page boundry
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xFF,
         fz_round_rect(fz_transform_rect(page->page_bounds, draw_page_ctm)));
@@ -244,13 +245,12 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
   return FALSE;
 }
 
-static void activate(GtkApplication *app, gpointer user_data) {
+static void activate(GtkApplication *app, Client *c) {
   GtkWidget *window;
 
   window = gtk_application_window_new(app);
   gtk_window_set_title(GTK_WINDOW(window), "Window");
   gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
-  Client *c = (Client *)user_data;
 
   c->container = gtk_drawing_area_new();
 
@@ -359,6 +359,6 @@ int main(int argc, char **argv) {
   g_signal_connect(app, "activate", G_CALLBACK(activate), c);
   status = g_application_run(G_APPLICATION(app), argc, argv);
   g_object_unref(app);
-
+  fz_drop_context(ctx);
   return status;
 }
