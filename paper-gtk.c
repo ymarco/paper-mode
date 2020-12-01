@@ -153,11 +153,10 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event,
   return FALSE;
 }
 
-static void scroll(DocInfo *doci, float delta_x, float delta_y) {
-  // TODO don't let scroll_x get out of the page
-  doci->scroll_x += delta_x;
-  doci->scroll_y += delta_y;
-  // move to next pages if scroll_y is past the page bound
+/*
+ * Move to next/previous pages if scroll_y is past the page bound
+ */
+static void scroll_pages(DocInfo *doci) {
   while (doci->scroll_y >= get_page(doci, doci->location)->page_bounds.y1) {
     doci->scroll_y -= get_page(doci, doci->location)->page_bounds.y1;
     doci->location = fz_next_page(ctx, doci->doc, doci->location);
@@ -167,6 +166,13 @@ static void scroll(DocInfo *doci, float delta_x, float delta_y) {
     doci->location = fz_previous_page(ctx, doci->doc, doci->location);
     doci->scroll_y += get_page(doci, doci->location)->page_bounds.y1;
   }
+}
+
+static void scroll(DocInfo *doci, float delta_x, float delta_y) {
+  // TODO don't let scroll_x get out of the page
+  doci->scroll_x += delta_x;
+  doci->scroll_y += delta_y;
+  scroll_pages(doci);
 }
 
 static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
