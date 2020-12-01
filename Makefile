@@ -3,17 +3,17 @@ CFLAGS += `pkg-config --cflags gtk+-3.0 --libs cairo`
 CFLAGS += -I/usr/local/include
 CFLAGS += -lm
 
-# all : mupdf-module.so
-mupdf-gtk: mupdf-gtk.c
+# all : paper-module.so
+paper-gtk: paper-gtk.c
 	$(CC) $(CFLAGS) -o $@ $^ /usr/local/lib/libmupdf.a /usr/local/lib/libmupdf-third.a
 
 debug: CFLAGS += -DDEBUG -g
-debug: mupdf-module.so
+debug: paper-module.so
 
-mupdf-module.so : mupdf-module.c
+paper-module.so : paper-module.c
 	$(CC) -shared $(CFLAGS) -o $@  $^
 
 clean :
-	$(RM) mupdf-module.so
+	$(RM) paper-module.so paper-gtk
 
 .PHONY : clean all

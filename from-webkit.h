@@ -1,4 +1,4 @@
-#include "mupdf-gtk.h"
+#include "paper-gtk.h"
 #include <gtk/gtk.h>
 
 #ifdef DEBUG

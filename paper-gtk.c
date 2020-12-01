@@ -4,7 +4,7 @@
 #include <mupdf/ucdn.h>
 
 #include "from-webkit.h"
-#include "mupdf-gtk.h"
+#include "paper-gtk.h"
 #include <gtk/gtk.h>
 
 static fz_context *ctx;
