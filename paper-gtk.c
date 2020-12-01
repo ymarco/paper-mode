@@ -47,14 +47,14 @@ fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
 }
 
 /*
- * Set scroll_x so the current page is centered.
+ * Set scroll.x so the current page is centered.
  */
 static void center_page(int surface_width, DocInfo *doci) {
   Page *page = get_page(doci, doci->location);
   fz_matrix scale_ctm = get_scale_ctm(doci, page);
   fz_irect scaled_bounds =
       fz_round_rect(fz_transform_rect(page->page_bounds, scale_ctm));
-  doci->scroll_x =
+  doci->scroll.x =
       ((double)(surface_width - (int)fz_irect_width(scaled_bounds))) / 2;
 }
 
@@ -89,12 +89,12 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   Page *page = &c->doci->pages[loc.chapter][loc.page];
   fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
-  float stopped_y =
-      fz_transform_point(fz_make_point(0, -c->doci->scroll_y), scale_ctm).y;
-  while (stopped_y < height) {
+  fz_point stopped =
+      fz_transform_point(fz_make_point(0, -c->doci->scroll.y), scale_ctm);
+  while (stopped.y < height) {
     fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
     fz_matrix draw_page_ctm =
-        fz_concat(scale_ctm, fz_translate(c->doci->scroll_x, stopped_y));
+        fz_concat(scale_ctm, fz_translate(c->doci->scroll.x, stopped.y));
     // foreground around page boundry
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xFF,
@@ -103,9 +103,9 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
     int margin = 20;
-    stopped_y += fz_transform_rect(page->page_bounds, scale_ctm).y1 + margin;
-    fprintf(stderr, "\rscroll_y: %3.0f, stopped_y: %3.0f", c->doci->scroll_y,
-            stopped_y);
+    stopped.y += fz_transform_rect(page->page_bounds, scale_ctm).y1 + margin;
+    fprintf(stderr, "\rscroll_y: %3.0f, stopped.y: %3.0f", c->doci->scroll.y,
+            stopped.y);
     fz_location next = fz_next_page(ctx, c->doci->doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
       // end of document
@@ -155,29 +155,29 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event,
 }
 
 /*
- * Move to next/previous pages if scroll_y is past the page bound
+ * Move to next/previous pages if scroll.y is past the page bound
  */
 static void scroll_pages(DocInfo *doci) {
-  while (doci->scroll_y >= get_page(doci, doci->location)->page_bounds.y1) {
-    doci->scroll_y -= get_page(doci, doci->location)->page_bounds.y1;
+  while (doci->scroll.y >= get_page(doci, doci->location)->page_bounds.y1) {
+    doci->scroll.y -= get_page(doci, doci->location)->page_bounds.y1;
     doci->location = fz_next_page(ctx, doci->doc, doci->location);
   }
-  // move to previous pages if scroll_y is negative
-  while (doci->scroll_y < 0) {
+  // move to previous pages if scroll.y is negative
+  while (doci->scroll.y < 0) {
     doci->location = fz_previous_page(ctx, doci->doc, doci->location);
-    doci->scroll_y += get_page(doci, doci->location)->page_bounds.y1;
+    doci->scroll.y += get_page(doci, doci->location)->page_bounds.y1;
   }
 }
 
 static void scroll(DocInfo *doci, float delta_x, float delta_y) {
-  // TODO don't let scroll_x get out of the page
-  doci->scroll_x += delta_x;
-  doci->scroll_y += delta_y;
+  // TODO don't let scroll.x get out of the page
+  doci->scroll.x += delta_x;
+  doci->scroll.y += delta_y;
   scroll_pages(doci);
 }
 
 /*
- * Increase zoom by D_ZOOM and set scroll_x, scroll_y so that POINT (a point in
+ * Increase zoom by D_ZOOM and set scroll.x, scroll.y so that POINT (a point in
  * the bounds of WIDGET) stays on the same pixel as it did before adjusting the
  * zoom.
  */
@@ -185,7 +185,7 @@ static void zoom_around(GtkWidget *widget, DocInfo *doci, float d_zoom,
                         fz_point point) {
   fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
   fz_matrix draw_page_ctm =
-      fz_concat(scale_ctm, fz_translate(doci->scroll_x, doci->scroll_y));
+      fz_concat(scale_ctm, fz_translate(doci->scroll.x, doci->scroll.y));
   fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
   fz_point original_point_in_page = fz_transform_point(point, draw_page_inv);
 
@@ -194,9 +194,9 @@ static void zoom_around(GtkWidget *widget, DocInfo *doci, float d_zoom,
   fz_point new_point =
       fz_transform_point(original_point_in_page, new_scale_ctm);
   fz_point diff = fz_make_point(point.x - new_point.x, point.y - new_point.y);
-  doci->scroll_x = diff.x;
+  doci->scroll.x = diff.x;
   // TODO
-  /* doci->scroll_y = diff.y; */
+  /* doci->scroll.y = diff.y; */
   scroll_pages(doci);
 }
 
@@ -348,7 +348,7 @@ int main(int argc, char **argv) {
   fz_location loc = {0, 1};
   doci->location = loc;
   doci->zoom = 50.0f;
-  /* doci->scroll_y = -get_page(doci, doci->location)->page_bounds.y1 / 2; */
+  /* doci->scroll.y = -get_page(doci, doci->location)->page_bounds.y1 / 2; */
   fprintf(stderr, "bounds: w %f, h %f\n",
           get_page(doci, doci->location)->page_bounds.x1,
           get_page(doci, doci->location)->page_bounds.y1);

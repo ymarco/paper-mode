@@ -28,8 +28,8 @@ typedef struct DocInfo {
   /* pages[location.chapter][location.page] = page */
   Page **pages;
   /* 0 <= scroll <= pages[location.chapter][location.page].page_bounds.y1 */
-  float scroll_x;
-  float scroll_y;
+  /* scroll is always inside the current page bounds */
+  fz_point scroll;
   int chapter_count;
   int *page_count_for_chapter;
   char filename[PATH_MAX];
