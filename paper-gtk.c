@@ -175,6 +175,30 @@ static void scroll(DocInfo *doci, float delta_x, float delta_y) {
   scroll_pages(doci);
 }
 
+/*
+ * Increase zoom by D_ZOOM and set scroll_x, scroll_y so that POINT (a point in
+ * the bounds of WIDGET) stays on the same pixel as it did before adjusting the
+ * zoom.
+ */
+static void zoom_around(GtkWidget *widget, DocInfo *doci, float d_zoom,
+                        fz_point point) {
+  fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
+  fz_matrix draw_page_ctm =
+      fz_concat(scale_ctm, fz_translate(doci->scroll_x, doci->scroll_y));
+  fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
+  fz_point original_point_in_page = fz_transform_point(point, draw_page_inv);
+
+  doci->zoom += d_zoom;
+  fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
+  fz_point new_point =
+      fz_transform_point(original_point_in_page, new_scale_ctm);
+  fz_point diff = fz_make_point(point.x - new_point.x, point.y - new_point.y);
+  doci->scroll_x = diff.x;
+  // TODO
+  /* doci->scroll_y = diff.y; */
+  scroll_pages(doci);
+}
+
 static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
                              Client *c) {
   if (event->type != GDK_SCROLL) {
@@ -193,9 +217,8 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
     default:
       fprintf(stderr, "unhandled zoom scroll case\n");
     }
-    c->doci->zoom += d_y;
+    zoom_around(widget, c->doci, d_y, fz_make_point(event->x, event->y));
   } else { // scroll
-    // TODO check state and zoom for ctrl+scroll
     switch (event->direction) {
     case GDK_SCROLL_UP:
       d_y = -50;
