@@ -7,6 +7,7 @@
 #include <gtk/gtk.h>
 
 static fz_context *ctx;
+const int PAGE_SEPARATOR_HEIGHT = 18;
 
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
@@ -150,10 +151,9 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     /* fz_run_page(ctx, page->page, draw_device, draw_page_ctm, &cookie); */
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
-    int margin = 20;
     /* fprintf(stderr, "\rscroll: %3.0f %3.0f, stopped.y: %3.0f", */
     /*         c->doci->scroll.x, c->doci->scroll.y, stopped.y); */
-    stopped.y += page->page_bounds.y1 + margin;
+    stopped.y += page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
     fz_location next = fz_next_page(ctx, c->doci->doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
       // end of document
