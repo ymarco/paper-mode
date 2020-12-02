@@ -181,8 +181,8 @@ static void scroll(DocInfo *doci, float delta_x, float delta_y) {
  * the bounds of WIDGET) stays on the same pixel as it did before adjusting the
  * zoom.
  */
-static void zoom_around(GtkWidget *widget, DocInfo *doci, float d_zoom,
-                        fz_point point) {
+static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float d_zoom,
+                              fz_point point) {
   fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
   fz_matrix draw_page_ctm =
       fz_concat(scale_ctm, fz_translate(doci->scroll.x, doci->scroll.y));
@@ -218,7 +218,7 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
     default:
       fprintf(stderr, "unhandled zoom scroll case\n");
     }
-    zoom_around(widget, c->doci, d_y, fz_make_point(event->x, event->y));
+    zoom_around_point(widget, c->doci, d_y, fz_make_point(event->x, event->y));
   } else { // scroll
     switch (event->direction) {
     case GDK_SCROLL_UP:
