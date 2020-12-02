@@ -73,6 +73,24 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
+static void highlight_selection(DocInfo *doci, fz_pixmap *pixmap,
+                                fz_matrix ctm) {
+
+  const int hl_count = 2048;
+  fz_quad hl[hl_count];
+  Page *page = get_page(doci, doci->location);
+  int hits_count =
+      fz_highlight_selection(ctx, page->page_text, doci->selection_start,
+                             doci->selection_end, hl, hl_count);
+  for (int i = 0; i < hits_count; i++) {
+    fz_quad box = fz_transform_quad(hl[i], ctm);
+    fz_clear_pixmap_rect_with_value(
+        ctx, pixmap, 0xE8,
+        fz_round_rect(fz_make_rect(box.ul.x, box.ul.y, box.lr.x, box.lr.y)));
+    // TODO actually fill in the quad instead of assuming its a rectangle
+  }
+}
+
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   cairo_surface_t *surface = c->image_surf;
@@ -83,10 +101,6 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
   unsigned char *image = cairo_image_surface_get_data(surface);
 
   fz_irect whole_rect = {.x1 = width, .y1 = height};
-
-  if (c->has_mouse_event && c->mouse_event.button == 2) {
-    center_page(width, c->doci);
-  }
 
   fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
       ctx, c->doci->colorspace, whole_rect, NULL, 1, image);
@@ -112,6 +126,10 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xFF,
         fz_round_rect(fz_transform_rect(page->page_bounds, draw_page_ctm)));
+    // selection rectangle
+    if (c->doci->selection_active || c->doci->selecting) {
+      highlight_selection(c->doci, pixmap, draw_page_ctm);
+    }
     /* fz_run_page(ctx, page->page, draw_device, draw_page_ctm, &cookie); */
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
@@ -134,20 +152,6 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
   fz_drop_pixmap(ctx, pixmap);
   cairo_set_source_surface(cr, surface, 0, 0);
   cairo_paint(cr);
-
-  if (c->has_mouse_event) {
-    c->has_mouse_event = FALSE;
-    // draw a circle where clicked
-    GdkRGBA color;
-    GtkStyleContext *style = gtk_widget_get_style_context(widget);
-    gtk_render_background(style, cr, 0, 0, width, height);
-    cairo_arc(cr, c->mouse_event.x, c->mouse_event.y, 20.0, 0, 2 * G_PI);
-    gtk_style_context_get_color(style, gtk_style_context_get_state(style),
-                                &color);
-    gdk_cairo_set_source_rgba(cr, &color);
-    cairo_fill(cr);
-  }
-
   return FALSE;
 }
 
@@ -160,10 +164,49 @@ static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation,
 
 static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event,
                                    Client *c) {
-  c->mouse_event = *event;
-  c->has_mouse_event = TRUE;
-  fprintf(stderr, "Mouse button: %d, type: %d\n", event->button, event->type);
-  gtk_widget_queue_draw(widget);
+  switch (event->button) {
+  case GDK_BUTTON_PRIMARY:
+    c->doci->selecting = TRUE;
+    c->doci->selection_start =
+        trace_point_to_page(widget, c->doci, fz_make_point(event->x, event->y));
+    break;
+  case GDK_BUTTON_MIDDLE:;
+    int width = gtk_widget_get_allocated_width(widget);
+    center_page(width, c->doci);
+    gtk_widget_queue_draw(widget);
+    // TODO smooth scrolling like evince has
+    break;
+  }
+  return FALSE;
+}
+
+static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event,
+                                     Client *c) {
+  DocInfo *doci = c->doci;
+  switch (event->button) {
+  case GDK_BUTTON_PRIMARY:
+    if (doci->selecting) {
+      gtk_widget_queue_draw(widget);
+    }
+    doci->selecting = FALSE;
+    doci->selection_end =
+        trace_point_to_page(widget, doci, fz_make_point(event->x, event->y));
+    doci->selection_active =
+        memcmp(&doci->selection_start, &doci->selection_end,
+               sizeof(fz_point)) != 0;
+
+    break;
+  }
+  return FALSE;
+}
+
+static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event,
+                                    Client *c) {
+  if (event->state & GDK_BUTTON1_MASK) {
+    c->doci->selection_end =
+        trace_point_to_page(widget, c->doci, fz_make_point(event->x, event->y));
+    gtk_widget_queue_draw(widget);
+  }
   return FALSE;
 }
 
@@ -270,16 +313,18 @@ void init_client(Client *c, GtkWidget *container) {
   // TODO when I also add GDK_SMOOTH_SCROLL_MASK all scroll events turn to
   // smooth ones with deltas of 0, I don't know how to find the direction in
   // those cases
-  gtk_widget_add_events(c->view,
-                        GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
-                            GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
-                            GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
-                            GDK_POINTER_MOTION_MASK |
-                            GDK_POINTER_MOTION_HINT_MASK | GDK_SCROLL_MASK);
-  /* gtk_signal_connect(GTK_OBJECT(c->view), "motion_notify_event", */
-  /*                    (GtkSignalFunc)motion_notify_event, c); */
-  g_signal_connect(G_OBJECT(c->view), "button-release-event",
+  gtk_widget_add_events(c->view, GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
+                                     GDK_BUTTON_PRESS_MASK |
+                                     GDK_BUTTON_RELEASE_MASK |
+                                     GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
+                                     GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK);
+
+  g_signal_connect(G_OBJECT(c->view), "button-press-event",
                    G_CALLBACK(button_press_event), c);
+  g_signal_connect(G_OBJECT(c->view), "motion-notify-event",
+                   G_CALLBACK(motion_notify_event), c);
+  g_signal_connect(G_OBJECT(c->view), "button-release-event",
+                   G_CALLBACK(button_release_event), c);
   g_signal_connect(G_OBJECT(c->view), "scroll-event", G_CALLBACK(scroll_event),
                    c);
 }

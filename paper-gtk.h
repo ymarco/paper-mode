@@ -32,6 +32,10 @@ typedef struct DocInfo {
   fz_point scroll;
   int chapter_count;
   int *page_count_for_chapter;
+  gboolean selecting;
+  gboolean selection_active;
+  fz_point selection_start;
+  fz_point selection_end;
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   fz_colorspace *colorspace;
