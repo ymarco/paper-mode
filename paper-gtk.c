@@ -64,9 +64,24 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
+static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  if ((!c->image_surf) ||
+      cairo_image_surface_get_width(c->image_surf) != allocation->width ||
+      cairo_image_surface_get_height(c->image_surf) != allocation->height) {
+    cairo_surface_destroy(c->image_surf);
+    c->image_surf = cairo_image_surface_create(
+        CAIRO_FORMAT_RGB24, allocation->width, allocation->height);
+    fprintf(stderr, "finished allocating\n");
+  }
+}
+
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   fprintf(stderr, "drawing!\n");
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  GdkRectangle rec = {.width = gtk_widget_get_allocated_width(widget),
+                      .height = gtk_widget_get_allocated_height(widget)};
+  allocate_pixmap(widget, &rec);
 
   cairo_surface_t *surface = c->image_surf;
 
@@ -142,13 +157,6 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   }
 
   return FALSE;
-}
-
-static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
-  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  cairo_surface_destroy(c->image_surf);
-  c->image_surf = cairo_image_surface_create(
-      CAIRO_FORMAT_RGB24, allocation->width, allocation->height);
 }
 
 static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
@@ -330,7 +338,7 @@ static void paper_view_class_init(PaperViewClass *class) {
   /* overwrite methods */
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(class);
   widget_class->draw = draw_callback;
-  widget_class->size_allocate = allocate_pixmap;
+  /* widget_class->size_allocate = size_allocate_stump; */
   widget_class->button_press_event = button_press_event;
   widget_class->button_release_event = button_press_event;
   widget_class->scroll_event = scroll_event;
