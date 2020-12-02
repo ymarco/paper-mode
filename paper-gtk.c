@@ -52,10 +52,13 @@ fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
 static void center_page(int surface_width, DocInfo *doci) {
   Page *page = get_page(doci, doci->location);
   fz_matrix scale_ctm = get_scale_ctm(doci, page);
-  fz_irect scaled_bounds =
-      fz_round_rect(fz_transform_rect(page->page_bounds, scale_ctm));
-  doci->scroll.x =
-      ((double)(surface_width - (int)fz_irect_width(scaled_bounds))) / 2;
+  fz_rect scaled_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
+  fz_matrix scale_ctm_inv = fz_invert_matrix(scale_ctm);
+  fz_point centered_page_start = fz_transform_point(
+      fz_make_point(((float)scaled_bounds.x1 - surface_width) / 2, 0),
+      scale_ctm_inv);
+
+  doci->scroll.x = centered_page_start.x;
 }
 
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
