@@ -177,19 +177,19 @@ static void scroll(DocInfo *doci, float delta_x, float delta_y) {
 }
 
 /*
- * Increase zoom by D_ZOOM and set scroll.x, scroll.y so that POINT (a point in
- * the bounds of WIDGET) stays on the same pixel as it did before adjusting the
- * zoom.
+ * Increase zoom by ZOOM_MULTIPLIER and set scroll.x, scroll.y so that POINT (a
+ * point in the bounds of WIDGET) stays on the same pixel as it did before
+ * adjusting the zoom.
  */
-static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float d_zoom,
-                              fz_point point) {
+static void zoom_around_point(GtkWidget *widget, DocInfo *doci,
+                              float zoom_multiplier, fz_point point) {
   fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
   fz_matrix draw_page_ctm =
       fz_concat(fz_translate(-doci->scroll.x, -doci->scroll.y), scale_ctm);
   fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
   fz_point original_point_in_page = fz_transform_point(point, draw_page_inv);
 
-  doci->zoom += d_zoom;
+  doci->zoom *= zoom_multiplier;
   fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
   fz_matrix new_scale_ctm_inv = fz_invert_matrix(new_scale_ctm);
   fz_point new_point =
@@ -207,20 +207,22 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
     fprintf(stderr, "Scroll handler called on something that isn't scroll.\n");
     return TRUE;
   }
-  float d_x = 0.0f, d_y = 0.0f;
   if (event->state & GDK_CONTROL_MASK) { // zoom
+    float multiplier = 1;
     switch (event->direction) {
     case GDK_SCROLL_UP:
-      d_y = 10;
+      multiplier = 1.1;
       break;
     case GDK_SCROLL_DOWN:
-      d_y = -10;
+      multiplier = 1 / 1.1;
       break;
     default:
       fprintf(stderr, "unhandled zoom scroll case\n");
     }
-    zoom_around_point(widget, c->doci, d_y, fz_make_point(event->x, event->y));
+    zoom_around_point(widget, c->doci, multiplier,
+                      fz_make_point(event->x, event->y));
   } else { // scroll
+    float d_x = 0.0f, d_y = 0.0f;
     switch (event->direction) {
     case GDK_SCROLL_UP:
       d_y = -50;
