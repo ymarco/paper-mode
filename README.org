@@ -28,6 +28,7 @@ window. Once I have mouse controls and things stabilize I'll embed it into Emacs
   + [ ] Search
     - [ ] Normal
     - [ ] With a swiper-like preview of the results
+  + [ ] Imenu to show PDF outline/bookmarks
   + [ ] Change bg & fg colors to comply with the Emacs theme, pdf-midnight-mode
   + [ ] Opening PDFs with passwords
   + [ ] Ace link selection
