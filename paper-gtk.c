@@ -89,12 +89,11 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   Page *page = &c->doci->pages[loc.chapter][loc.page];
   fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
-  fz_point stopped =
-      fz_transform_point(fz_make_point(0, -c->doci->scroll.y), scale_ctm);
-  while (stopped.y < height) {
+  fz_point stopped = fz_make_point(-c->doci->scroll.x, -c->doci->scroll.y);
+  while (fz_transform_point(stopped, scale_ctm).y < height) {
     fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
     fz_matrix draw_page_ctm =
-        fz_concat(scale_ctm, fz_translate(c->doci->scroll.x, stopped.y));
+        fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
     // foreground around page boundry
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xFF,
@@ -103,9 +102,9 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
     int margin = 20;
-    stopped.y += fz_transform_rect(page->page_bounds, scale_ctm).y1 + margin;
     fprintf(stderr, "\rscroll_y: %3.0f, stopped.y: %3.0f", c->doci->scroll.y,
             stopped.y);
+    stopped.y += page->page_bounds.y1 + margin;
     fz_location next = fz_next_page(ctx, c->doci->doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
       // end of document
