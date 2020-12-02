@@ -39,6 +39,7 @@ typedef struct DocInfo {
 
 typedef struct Client {
   GtkWidget *container;
+  GtkWidget *view;
   DocInfo *doci;
   int fd;
   cairo_surface_t *image_surf;

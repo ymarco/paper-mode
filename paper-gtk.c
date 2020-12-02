@@ -3,7 +3,6 @@
 #include <mupdf/pdf.h> /* for pdf specifics and forms */
 #include <mupdf/ucdn.h>
 
-#include "from-webkit.h"
 #include "paper-gtk.h"
 #include <gtk/gtk.h>
 
@@ -74,7 +73,6 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
 
   if (c->has_mouse_event && c->mouse_event.button == 2) {
     center_page(width, c->doci);
-    fprintf(stderr, "centering!\n");
   }
 
   fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
@@ -105,8 +103,8 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
     int margin = 20;
-    fprintf(stderr, "\rscroll_y: %3.0f, stopped.y: %3.0f", c->doci->scroll.y,
-            stopped.y);
+    /* fprintf(stderr, "\rscroll: %3.0f %3.0f, stopped.y: %3.0f", */
+    /*         c->doci->scroll.x, c->doci->scroll.y, stopped.y); */
     stopped.y += page->page_bounds.y1 + margin;
     fz_location next = fz_next_page(ctx, c->doci->doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
@@ -248,38 +246,39 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
   return FALSE;
 }
 
-static void activate(GtkApplication *app, Client *c) {
-  GtkWidget *window;
+void init_client(Client *c, GtkWidget *container) {
+  c->container = container;
+  c->view = gtk_drawing_area_new();
 
-  window = gtk_application_window_new(app);
-  gtk_window_set_title(GTK_WINDOW(window), "Window");
-  gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
+  gtk_container_add(GTK_CONTAINER(container), GTK_WIDGET(c->view));
 
-  c->container = gtk_drawing_area_new();
-
-  gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(c->container));
-
-  g_signal_connect(G_OBJECT(c->container), "draw", G_CALLBACK(draw_callback),
-                   c);
-  g_signal_connect(G_OBJECT(c->container), "size-allocate",
+  g_signal_connect(G_OBJECT(c->view), "draw", G_CALLBACK(draw_callback), c);
+  g_signal_connect(G_OBJECT(c->view), "size-allocate",
                    G_CALLBACK(allocate_pixmap), c);
   // handle mouse hover and click
 
   // TODO when I also add GDK_SMOOTH_SCROLL_MASK all scroll events turn to
   // smooth ones with deltas of 0, I don't know how to find the direction in
   // those cases
-  gtk_widget_add_events(c->container,
+  gtk_widget_add_events(c->view,
                         GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
                             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
                             GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
                             GDK_POINTER_MOTION_MASK |
                             GDK_POINTER_MOTION_HINT_MASK | GDK_SCROLL_MASK);
-  /* gtk_signal_connect(GTK_OBJECT(c->container), "motion_notify_event", */
+  /* gtk_signal_connect(GTK_OBJECT(c->view), "motion_notify_event", */
   /*                    (GtkSignalFunc)motion_notify_event, c); */
-  g_signal_connect(G_OBJECT(c->container), "button-release-event",
+  g_signal_connect(G_OBJECT(c->view), "button-release-event",
                    G_CALLBACK(button_press_event), c);
-  g_signal_connect(G_OBJECT(c->container), "scroll-event",
-                   G_CALLBACK(scroll_event), c);
+  g_signal_connect(G_OBJECT(c->view), "scroll-event", G_CALLBACK(scroll_event),
+                   c);
+}
+
+static void activate(GtkApplication *app, Client *c) {
+  GtkWidget *window = gtk_application_window_new(app);
+  gtk_window_set_title(GTK_WINDOW(window), "Window");
+  gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
+  init_client(c, window);
 
   gtk_widget_show_all(window);
 }
