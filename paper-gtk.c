@@ -8,8 +8,6 @@
 
 static fz_context *ctx;
 
-/* G_DEFINE_TYPE_WITH_CODE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA,
- * G_ADD_PRIVATE(PaperView)) */
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
 void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
@@ -103,12 +101,10 @@ static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
     cairo_surface_destroy(c->image_surf);
     c->image_surf = cairo_image_surface_create(
         CAIRO_FORMAT_RGB24, allocation->width, allocation->height);
-    fprintf(stderr, "finished allocating\n");
   }
 }
 
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
-  fprintf(stderr, "drawing!\n");
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   GdkRectangle rec = {.width = gtk_widget_get_allocated_width(widget),
                       .height = gtk_widget_get_allocated_height(widget)};
@@ -269,7 +265,6 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci,
 static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   if (event->type != GDK_SCROLL) {
-    fprintf(stderr, "Scroll handler called on something that isn't scroll.\n");
     return TRUE;
   }
   if (event->state & GDK_CONTROL_MASK) { // zoom
@@ -323,7 +318,6 @@ PaperView *paper_view_new(DocInfo *doci) {
   PaperViewPrivate *c = paper_view_get_instance_private(widget);
   c->doci = doci;
   c->has_mouse_event = FALSE;
-  fprintf(stderr, "finish new\n");
   return PAPER_VIEW(ret);
 }
 
