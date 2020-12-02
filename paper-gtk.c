@@ -46,6 +46,19 @@ fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
 }
 
 /*
+ * Get the position of POINT whithin the boundries of the current page.
+ * TODO handle next pages and not only the current one
+ */
+static fz_point trace_point_to_page(GtkWidget *widget, DocInfo *doci,
+                                    fz_point point) {
+  fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
+  fz_matrix draw_page_ctm =
+      fz_concat(fz_translate(-doci->scroll.x, -doci->scroll.y), scale_ctm);
+  fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
+  return fz_transform_point(point, draw_page_inv);
+}
+
+/*
  * Set scroll.x so the current page is centered.
  */
 static void center_page(int surface_width, DocInfo *doci) {
@@ -183,12 +196,7 @@ static void scroll(DocInfo *doci, float delta_x, float delta_y) {
  */
 static void zoom_around_point(GtkWidget *widget, DocInfo *doci,
                               float zoom_multiplier, fz_point point) {
-  fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
-  fz_matrix draw_page_ctm =
-      fz_concat(fz_translate(-doci->scroll.x, -doci->scroll.y), scale_ctm);
-  fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
-  fz_point original_point_in_page = fz_transform_point(point, draw_page_inv);
-
+  fz_point original_point_in_page = trace_point_to_page(widget, doci, point);
   doci->zoom *= zoom_multiplier;
   fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
   fz_matrix new_scale_ctm_inv = fz_invert_matrix(new_scale_ctm);
