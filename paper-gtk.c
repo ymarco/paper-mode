@@ -8,6 +8,10 @@
 
 static fz_context *ctx;
 
+/* G_DEFINE_TYPE_WITH_CODE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA,
+ * G_ADD_PRIVATE(PaperView)) */
+G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
+
 void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
   if (doci->pages[chapter])
     return;
@@ -60,7 +64,9 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
-gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
+gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
+  fprintf(stderr, "drawing!\n");
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
 
   cairo_surface_t *surface = c->image_surf;
 
@@ -138,15 +144,15 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr, Client *c) {
   return FALSE;
 }
 
-static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation,
-                            Client *c) {
+static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   cairo_surface_destroy(c->image_surf);
   c->image_surf = cairo_image_surface_create(
       CAIRO_FORMAT_RGB24, allocation->width, allocation->height);
 }
 
-static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event,
-                                   Client *c) {
+static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->mouse_event = *event;
   c->has_mouse_event = TRUE;
   fprintf(stderr, "Mouse button: %d, type: %d\n", event->button, event->type);
@@ -201,8 +207,8 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float d_zoom,
   scroll_pages(doci);
 }
 
-static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
-                             Client *c) {
+static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   if (event->type != GDK_SCROLL) {
     fprintf(stderr, "Scroll handler called on something that isn't scroll.\n");
     return TRUE;
@@ -246,40 +252,29 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event,
   return FALSE;
 }
 
-void init_client(Client *c, GtkWidget *container) {
-  c->container = container;
-  c->view = gtk_drawing_area_new();
+PaperView *paper_view_new(DocInfo *doci) {
+  g_return_val_if_fail(doci != NULL, NULL);
 
-  gtk_container_add(GTK_CONTAINER(container), GTK_WIDGET(c->view));
-
-  g_signal_connect(G_OBJECT(c->view), "draw", G_CALLBACK(draw_callback), c);
-  g_signal_connect(G_OBJECT(c->view), "size-allocate",
-                   G_CALLBACK(allocate_pixmap), c);
-  // handle mouse hover and click
-
-  // TODO when I also add GDK_SMOOTH_SCROLL_MASK all scroll events turn to
-  // smooth ones with deltas of 0, I don't know how to find the direction in
-  // those cases
-  gtk_widget_add_events(c->view,
-                        GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
-                            GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
-                            GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
-                            GDK_POINTER_MOTION_MASK |
-                            GDK_POINTER_MOTION_HINT_MASK | GDK_SCROLL_MASK);
-  /* gtk_signal_connect(GTK_OBJECT(c->view), "motion_notify_event", */
-  /*                    (GtkSignalFunc)motion_notify_event, c); */
-  g_signal_connect(G_OBJECT(c->view), "button-release-event",
-                   G_CALLBACK(button_press_event), c);
-  g_signal_connect(G_OBJECT(c->view), "scroll-event", G_CALLBACK(scroll_event),
-                   c);
+  GObject *ret = g_object_new(TYPE_PAPER_VIEW, NULL);
+  if (ret == NULL) {
+    return NULL;
+  }
+  PaperView *widget = PAPER_VIEW(ret);
+  PaperViewPrivate *c = paper_view_get_instance_private(widget);
+  c->doci = doci;
+  c->has_mouse_event = FALSE;
+  fprintf(stderr, "finish new\n");
+  return PAPER_VIEW(ret);
 }
 
-static void activate(GtkApplication *app, Client *c) {
+static void activate(GtkApplication *app, DocInfo *doci) {
   GtkWidget *window = gtk_application_window_new(app);
   gtk_window_set_title(GTK_WINDOW(window), "Window");
   gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
-  init_client(c, window);
+  PaperView *paper = paper_view_new(doci);
+  gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(paper));
 
+  gtk_widget_show(GTK_WIDGET(paper));
   gtk_widget_show_all(window);
 }
 
@@ -330,6 +325,37 @@ void drop_page(Page *page) {
   memset(page, 0, sizeof(*page));
 }
 
+static void paper_view_class_init(PaperViewClass *class) {
+
+  /* overwrite methods */
+  GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(class);
+  widget_class->draw = draw_callback;
+  widget_class->size_allocate = allocate_pixmap;
+  widget_class->button_press_event = button_press_event;
+  widget_class->button_release_event = button_press_event;
+  widget_class->scroll_event = scroll_event;
+  /* widget_class->motion_notify_event  = cb_zathura_page_widget_motion_notify;
+   */
+  /* widget_class->leave_notify_event   = cb_zathura_page_widget_leave_notify;
+   */
+  /* widget_class->popup_menu           = cb_zathura_page_widget_popup_menu; */
+
+  /* GObjectClass *object_class = G_OBJECT_CLASS(class); */
+  /* object_class->dispose = zathura_page_widget_dispose; */
+  /* object_class->finalize = zathura_page_widget_finalize; */
+  /* gtk_widget_class->show = ev_loading_message_show; */
+  /* gtk_widget_class->hide = ev_loading_message_hide; */
+}
+
+static void paper_view_init(PaperView *self) {
+  gtk_widget_add_events(GTK_WIDGET(self),
+                        GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
+                            GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
+                            GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
+                            GDK_POINTER_MOTION_MASK |
+                            GDK_POINTER_MOTION_HINT_MASK | GDK_SCROLL_MASK);
+}
+
 int main(int argc, char **argv) {
   ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
   GtkApplication *app;
@@ -355,10 +381,7 @@ int main(int argc, char **argv) {
           get_page(doci, doci->location)->page_bounds.x1,
           get_page(doci, doci->location)->page_bounds.y1);
   app = gtk_application_new("org.gtk.example", G_APPLICATION_FLAGS_NONE);
-  Client client;
-  Client *c = &client;
-  c->doci = doci;
-  g_signal_connect(app, "activate", G_CALLBACK(activate), c);
+  g_signal_connect(app, "activate", G_CALLBACK(activate), doci);
   status = g_application_run(G_APPLICATION(app), argc, argv);
   g_object_unref(app);
   fz_drop_context(ctx);

@@ -23,7 +23,7 @@ typedef struct DocInfo {
   fz_outline *outline;
   pdf_document *pdf;
   pdf_annot *selected_annot;
-  float zoom; // in precentage
+  float zoom;   // in precentage
   float rotate; // in degrees
   /* pages[location.chapter][location.page] = page */
   Page **pages;
@@ -37,14 +37,38 @@ typedef struct DocInfo {
   fz_colorspace *colorspace;
 } DocInfo;
 
-typedef struct Client {
-  GtkWidget *container;
-  GtkWidget *view;
+typedef struct _PaperViewPrivate {
   DocInfo *doci;
-  int fd;
   cairo_surface_t *image_surf;
   GdkEventButton mouse_event;
   gboolean has_mouse_event;
+} PaperViewPrivate;
+
+typedef struct _PaperView {
+  GtkDrawingArea parent_instance;
+} PaperView;
+
+typedef struct _PaperViewClass {
+  GtkDrawingAreaClass parent_class;
+} PaperViewClass;
+
+GType paper_view_get_type(void) G_GNUC_CONST;
+
+#define TYPE_PAPER_VIEW (paper_view_get_type())
+#define PAPER_VIEW(obj)                                                        \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_PAPER_VIEW, PaperView))
+#define PAPER_VIEW_CLASS(klass)                                                \
+  (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_PAPER_VIEW, PaperViewClass))
+#define IS_PAPER_VIEW(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_PAPER_VIEW))
+#define IS_PAPER_VIEW_CLASS(klass)                                             \
+  (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_PAPER_VIEW))
+#define PAPER_VIEW_GET_CLASS(obj)                                              \
+  (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_PAPER_VIEW, PaperViewClass))
+
+typedef struct Client {
+  GtkWidget *container;
+  GtkWidget *view;
+  int fd;
 } Client;
 
 #endif // __MUPDF_GTK_H_
