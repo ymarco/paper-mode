@@ -187,18 +187,19 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float d_zoom,
                               fz_point point) {
   fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
   fz_matrix draw_page_ctm =
-      fz_concat(scale_ctm, fz_translate(doci->scroll.x, doci->scroll.y));
+      fz_concat(fz_translate(-doci->scroll.x, -doci->scroll.y), scale_ctm);
   fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
   fz_point original_point_in_page = fz_transform_point(point, draw_page_inv);
 
   doci->zoom += d_zoom;
   fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
+  fz_matrix new_scale_ctm_inv = fz_invert_matrix(new_scale_ctm);
   fz_point new_point =
       fz_transform_point(original_point_in_page, new_scale_ctm);
-  fz_point diff = fz_make_point(point.x - new_point.x, point.y - new_point.y);
-  doci->scroll.x = diff.x;
-  // TODO
-  /* doci->scroll.y = diff.y; */
+  fz_point scaled_diff =
+      fz_make_point(new_point.x - point.x, new_point.y - point.y);
+  fz_point unscaled_diff = fz_transform_point(scaled_diff, new_scale_ctm_inv);
+  doci->scroll = unscaled_diff;
   scroll_pages(doci);
 }
 
