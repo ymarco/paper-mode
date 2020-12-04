@@ -131,23 +131,23 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   fz_irect whole_rect = {.x1 = width, .y1 = height};
 
   fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
-      ctx, c->doci->colorspace, whole_rect, NULL, 1, image);
+      ctx, c->doci.colorspace, whole_rect, NULL, 1, image);
   // background
   fz_clear_pixmap_with_value(ctx, pixmap, 0xF0);
 
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
-  fz_location loc = c->doci->location;
-  fz_try(ctx) { ensure_page_is_loaded(c->doci, loc); }
+  fz_location loc = c->doci.location;
+  fz_try(ctx) { ensure_page_is_loaded(&c->doci, loc); }
   fz_catch(ctx) {
     fprintf(stderr, "can't load page");
     exit(EXIT_FAILURE);
   }
 
-  Page *page = &c->doci->pages[loc.chapter][loc.page];
-  fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
-  fz_point stopped = fz_make_point(-c->doci->scroll.x, -c->doci->scroll.y);
+  Page *page = &c->doci.pages[loc.chapter][loc.page];
+  fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
+  fz_point stopped = fz_make_point(-c->doci.scroll.x, -c->doci.scroll.y);
   while (fz_transform_point(stopped, scale_ctm).y < height) {
-    fz_matrix scale_ctm = get_scale_ctm(c->doci, page);
+    fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
     fz_matrix draw_page_ctm =
         fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
     // foreground around page boundry
@@ -155,23 +155,23 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
         ctx, pixmap, 0xFF,
         fz_round_rect(fz_transform_rect(page->page_bounds, draw_page_ctm)));
     // highlight text selection
-    if ((c->doci->selection_active || c->doci->selecting) &&
-        memcmp(&loc, &c->doci->selection_loc_end, sizeof(fz_location)) <= 0) {
+    if ((c->doci.selection_active || c->doci.selecting) &&
+        memcmp(&loc, &c->doci.selection_loc_end, sizeof(fz_location)) <= 0) {
       highlight_selection(page, pixmap, draw_page_ctm);
     }
     /* fz_run_page(ctx, page->page, draw_device, draw_page_ctm, &cookie); */
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
     /* fprintf(stderr, "\rscroll: %3.0f %3.0f, stopped.y: %3.0f", */
-    /*         c->doci->scroll.x, c->doci->scroll.y, stopped.y); */
+    /*         c->doci.scroll.x, c->doci->scroll.y, stopped.y); */
     stopped.y += page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
-    fz_location next = fz_next_page(ctx, c->doci->doc, loc);
+    fz_location next = fz_next_page(ctx, c->doci.doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
       // end of document
       break;
     }
     loc = next;
-    page = get_page(c->doci, loc);
+    page = get_page(&c->doci, loc);
   }
 
   fz_close_device(ctx, draw_device);
@@ -186,25 +186,25 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
-    c->doci->selecting = TRUE;
+    c->doci.selecting = TRUE;
     fz_point orig_point;
-    trace_point_to_page(widget, c->doci, fz_make_point(event->x, event->y),
-                        &orig_point, &c->doci->selection_loc_start);
-    Page *page = get_page(c->doci, c->doci->selection_loc_start);
+    trace_point_to_page(widget, &c->doci, fz_make_point(event->x, event->y),
+                        &orig_point, &c->doci.selection_loc_start);
+    Page *page = get_page(&c->doci, c->doci.selection_loc_start);
     page->selection_start = orig_point;
     fprintf(stderr, "start: %3.0f %3.0f\n", page->selection_start.x,
             page->selection_start.y);
     gtk_widget_queue_draw(widget);
     switch (event->type) {
     case GDK_BUTTON_PRESS:
-      c->doci->selection_mode = FZ_SELECT_CHARS;
+      c->doci.selection_mode = FZ_SELECT_CHARS;
       break;
     case GDK_2BUTTON_PRESS:
-      c->doci->selection_mode = FZ_SELECT_WORDS;
+      c->doci.selection_mode = FZ_SELECT_WORDS;
       fprintf(stderr, "button 2 press\n");
       break;
     case GDK_3BUTTON_PRESS:
-      c->doci->selection_mode = FZ_SELECT_LINES;
+      c->doci.selection_mode = FZ_SELECT_LINES;
       break;
     default:
       fprintf(stderr, "Unhandled button press type\n");
@@ -212,7 +212,7 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
     break;
   case GDK_BUTTON_MIDDLE:;
     int width = gtk_widget_get_allocated_width(widget);
-    center_page(width, c->doci);
+    center_page(width, &c->doci);
     gtk_widget_queue_draw(widget);
     // TODO smooth scrolling like evince has
     break;
@@ -223,16 +223,16 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
 static void complete_selection(GtkWidget *widget, fz_point point) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   fz_point end_point;
-  trace_point_to_page(widget, c->doci, point, &end_point,
-                      &c->doci->selection_loc_end);
-  Page *sel_end_page = get_page(c->doci, c->doci->selection_loc_end);
+  trace_point_to_page(widget, &c->doci, point, &end_point,
+                      &c->doci.selection_loc_end);
+  Page *sel_end_page = get_page(&c->doci, c->doci.selection_loc_end);
   sel_end_page->selection_end = end_point;
-  Page *sel_start_page = get_page(c->doci, c->doci->selection_loc_start);
+  Page *sel_start_page = get_page(&c->doci, c->doci.selection_loc_start);
   // set all pages between loc_start and loc_and to full selection
-  for (fz_location loc = c->doci->selection_loc_start;
-       memcmp(&loc, &c->doci->selection_loc_end, sizeof(fz_location)) <= 0;
-       loc = fz_next_page(ctx, c->doci->doc, loc)) {
-    Page *page = get_page(c->doci, loc);
+  for (fz_location loc = c->doci.selection_loc_start;
+       memcmp(&loc, &c->doci.selection_loc_end, sizeof(fz_location)) <= 0;
+       loc = fz_next_page(ctx, c->doci.doc, loc)) {
+    Page *page = get_page(&c->doci, loc);
     if (page != sel_start_page) {
       page->selection_start.x = page->page_bounds.x0;
       page->selection_start.y = page->page_bounds.y0;
@@ -242,13 +242,13 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
       page->selection_end.y = page->page_bounds.y1;
     }
     fz_snap_selection(ctx, page->page_text, &page->selection_start,
-                      &page->selection_end, c->doci->selection_mode);
+                      &page->selection_end, c->doci.selection_mode);
   }
 }
 
 static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  DocInfo *doci = c->doci;
+  DocInfo *doci = &c->doci;
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
     if (doci->selecting) {
@@ -335,7 +335,7 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
     default:
       fprintf(stderr, "unhandled zoom scroll case\n");
     }
-    zoom_around_point(widget, c->doci, multiplier,
+    zoom_around_point(widget, &c->doci, multiplier,
                       fz_make_point(event->x, event->y));
   } else { // scroll
     float d_x = 0.0f, d_y = 0.0f;
@@ -358,34 +358,10 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
       fprintf(stderr, "Smooth scroll\n");
       break;
     }
-    scroll(c->doci, d_x, d_y);
+    scroll(&c->doci, d_x, d_y);
   }
   gtk_widget_queue_draw(widget);
   return FALSE;
-}
-
-PaperView *paper_view_new(DocInfo *doci) {
-  g_return_val_if_fail(doci != NULL, NULL);
-  GObject *ret = g_object_new(TYPE_PAPER_VIEW, NULL);
-  if (ret == NULL) {
-    return NULL;
-  }
-  PaperView *widget = PAPER_VIEW(ret);
-  PaperViewPrivate *c = paper_view_get_instance_private(widget);
-  c->doci = doci;
-  c->has_mouse_event = FALSE;
-  return PAPER_VIEW(ret);
-}
-
-static void activate(GtkApplication *app, DocInfo *doci) {
-  GtkWidget *window = gtk_application_window_new(app);
-  gtk_window_set_title(GTK_WINDOW(window), "Window");
-  gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
-  PaperView *paper = paper_view_new(doci);
-  gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(paper));
-
-  gtk_widget_show(GTK_WIDGET(paper));
-  gtk_widget_show_all(window);
 }
 
 void load_doc(DocInfo *doci, char *filename, char *accel_filename) {
@@ -425,6 +401,30 @@ void load_doc(DocInfo *doci, char *filename, char *accel_filename) {
     exit(EXIT_FAILURE);
   }
 }
+
+PaperView *paper_view_new(char *filename, char *accel_filename) {
+  GObject *ret = g_object_new(TYPE_PAPER_VIEW, NULL);
+  if (ret == NULL) {
+    return NULL;
+  }
+  PaperView *widget = PAPER_VIEW(ret);
+  PaperViewPrivate *c = paper_view_get_instance_private(widget);
+  load_doc(&c->doci, filename, accel_filename);
+  c->has_mouse_event = FALSE;
+  return PAPER_VIEW(ret);
+}
+
+static void activate(GtkApplication *app, char *filename) {
+  GtkWidget *window = gtk_application_window_new(app);
+  gtk_window_set_title(GTK_WINDOW(window), "Window");
+  gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
+  PaperView *paper = paper_view_new(filename, NULL);
+  gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(paper));
+
+  gtk_widget_show(GTK_WIDGET(paper));
+  gtk_widget_show_all(window);
+}
+
 
 void drop_page(Page *page) {
   fz_drop_stext_page(ctx, page->page_text);
@@ -481,19 +481,8 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  DocInfo _doci;
-  DocInfo *doci = &_doci;
-  // TODO accel logic
-  load_doc(doci, "./amsmath.pdf", NULL);
-  fz_location loc = {0, 1};
-  doci->location = loc;
-  doci->zoom = 50.0f;
-  /* doci->scroll.y = -get_page(doci, doci->location)->page_bounds.y1 / 2; */
-  fprintf(stderr, "bounds: w %f, h %f\n",
-          get_page(doci, doci->location)->page_bounds.x1,
-          get_page(doci, doci->location)->page_bounds.y1);
   app = gtk_application_new("org.gtk.example", G_APPLICATION_FLAGS_NONE);
-  g_signal_connect(app, "activate", G_CALLBACK(activate), doci);
+  g_signal_connect(app, "activate", G_CALLBACK(activate), "./amsmath.pdf");
   status = g_application_run(G_APPLICATION(app), argc, argv);
   g_object_unref(app);
   fz_drop_context(ctx);

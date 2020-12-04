@@ -44,7 +44,7 @@ typedef struct DocInfo {
 } DocInfo;
 
 typedef struct _PaperViewPrivate {
-  DocInfo *doci;
+  DocInfo doci;
   cairo_surface_t *image_surf;
   GdkEventButton mouse_event;
   gboolean has_mouse_event;
