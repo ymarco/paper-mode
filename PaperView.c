@@ -425,14 +425,35 @@ static void activate(GtkApplication *app, char *filename) {
   gtk_widget_show_all(window);
 }
 
-
 void drop_page(Page *page) {
+  if (!page)
+    return;
   fz_drop_stext_page(ctx, page->page_text);
   fz_drop_separations(ctx, page->seps);
   fz_drop_link(ctx, page->links);
   fz_drop_page(ctx, page->page);
   fz_drop_display_list(ctx, page->display_list);
-  memset(page, 0, sizeof(*page));
+}
+
+static void paper_view_finalize(GObject *object) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(object));
+  cairo_surface_destroy(c->image_surf);
+  Page *chapter_pages;
+  for (int chapter = 0; chapter < c->doci.chapter_count; chapter++) {
+    chapter_pages = c->doci.pages[chapter];
+    if (chapter_pages) {
+      for (int page = 0; page < c->doci.page_count_for_chapter[chapter]; page++)
+        drop_page(&chapter_pages[page]);
+      free(chapter_pages);
+    }
+  }
+  fz_drop_document(ctx, c->doci.doc);
+  fz_drop_outline(ctx, c->doci.outline);
+  pdf_drop_document(ctx, c->doci.pdf);
+  pdf_drop_annot(ctx, c->doci.selected_annot);
+  free(c->doci.pages);
+  free(c->doci.page_count_for_chapter);
+  G_OBJECT_CLASS(paper_view_parent_class)->finalize(object);
 }
 
 static void paper_view_class_init(PaperViewClass *class) {
@@ -449,9 +470,8 @@ static void paper_view_class_init(PaperViewClass *class) {
    */
   /* widget_class->popup_menu           = cb_zathura_page_widget_popup_menu; */
 
-  /* GObjectClass *object_class = G_OBJECT_CLASS(class); */
-  /* object_class->dispose = zathura_page_widget_dispose; */
-  /* object_class->finalize = zathura_page_widget_finalize; */
+  GObjectClass *object_class = G_OBJECT_CLASS(class);
+  object_class->finalize = paper_view_finalize;
   /* gtk_widget_class->show = ev_loading_message_show; */
   /* gtk_widget_class->hide = ev_loading_message_hide; */
 }
