@@ -71,6 +71,9 @@ GType paper_view_get_type(void) G_GNUC_CONST;
 #define PAPER_VIEW_GET_CLASS(obj)                                              \
   (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_PAPER_VIEW, PaperViewClass))
 
+
+PaperView *paper_view_new(char *filename, char *accel_filename);
+
 typedef struct Client {
   GtkWidget *container;
   GtkWidget *view;

@@ -16,13 +16,13 @@ endif
 
 
 # all : paper-module.so
-paper-gtk: paper-gtk.c
+PaperView: PaperView.c
 	$(CC) $(CFLAGS) -o $@ $^ /usr/local/lib/libmupdf.a /usr/local/lib/libmupdf-third.a
 
 paper-module.so : paper-module.c
 	$(CC) -shared $(CFLAGS) -o $@  $^
 
 clean :
-	$(RM) paper-module.so paper-gtk
+	$(RM) paper-module.soPaperView 
 
 .PHONY : clean all

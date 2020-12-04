@@ -3,7 +3,7 @@
 #include <mupdf/pdf.h> /* for pdf specifics and forms */
 #include <mupdf/ucdn.h>
 
-#include "paper-gtk.h"
+#include "PaperView.h"
 #include <gtk/gtk.h>
 
 static fz_context *ctx;
