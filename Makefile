@@ -8,7 +8,7 @@ O_RELEASE := 0  # debug binary
 
 
 ifeq ($(O_DEBUG),1)
-	CFLAGS += -g
+	CFLAGS += -DDEBUG -g -Og
 endif
 ifeq ($(O_RELEASE),1)
 	CFLAGS += -O3 -flto
@@ -18,9 +18,6 @@ endif
 # all : paper-module.so
 paper-gtk: paper-gtk.c
 	$(CC) $(CFLAGS) -o $@ $^ /usr/local/lib/libmupdf.a /usr/local/lib/libmupdf-third.a
-
-debug: CFLAGS += -DDEBUG -g
-debug: paper-module.so
 
 paper-module.so : paper-module.c
 	$(CC) -shared $(CFLAGS) -o $@  $^
