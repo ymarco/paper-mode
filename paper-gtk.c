@@ -49,16 +49,27 @@ fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
 }
 
 /*
- * Get the position of POINT whithin the boundries of the current page.
- * TODO handle next pages and not only the current one
+ * Get the position of POINT whithin the boundries of the current or next pages.
  */
-static fz_point trace_point_to_page(GtkWidget *widget, DocInfo *doci,
-                                    fz_point point) {
-  fz_matrix scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
-  fz_matrix draw_page_ctm =
-      fz_concat(fz_translate(-doci->scroll.x, -doci->scroll.y), scale_ctm);
-  fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
-  return fz_transform_point(point, draw_page_inv);
+static void trace_point_to_page(GtkWidget *widget, DocInfo *doci,
+                                fz_point point, fz_point *res,
+                                fz_location *loc) {
+  *loc = doci->location;
+  fz_point stopped = fz_make_point(-doci->scroll.x, -doci->scroll.y);
+  Page *page = get_page(doci, *loc);
+  while (1) {
+    fz_matrix scale_ctm = get_scale_ctm(doci, page);
+    fz_matrix draw_page_ctm =
+        fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
+    fz_matrix draw_page_inv = fz_invert_matrix(draw_page_ctm);
+    *res = fz_transform_point(point, draw_page_inv);
+    stopped.y += page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
+    page = get_page(doci, *loc);
+    if (res->y < page->page_bounds.y1) {
+      break;
+    }
+    *loc = fz_next_page(ctx, doci->doc, *loc);
+  };
 }
 
 /*
@@ -76,15 +87,13 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
-static void highlight_selection(DocInfo *doci, fz_pixmap *pixmap,
-                                fz_matrix ctm) {
-
+static void highlight_selection(Page *page, fz_pixmap *pixmap, fz_matrix ctm) {
   const int hl_count = 2048;
+  // TODO cache hl when selection doesn't change?
   fz_quad hl[hl_count];
-  Page *page = get_page(doci, doci->location);
   int hits_count =
-      fz_highlight_selection(ctx, page->page_text, doci->selection_start,
-                             doci->selection_end, hl, hl_count);
+      fz_highlight_selection(ctx, page->page_text, page->selection_start,
+                             page->selection_end, hl, hl_count);
   for (int i = 0; i < hits_count; i++) {
     fz_quad box = fz_transform_quad(hl[i], ctm);
     fz_clear_pixmap_rect_with_value(
@@ -96,6 +105,7 @@ static void highlight_selection(DocInfo *doci, fz_pixmap *pixmap,
 
 static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  // allocate only if dimensions changed
   if ((!c->image_surf) ||
       cairo_image_surface_get_width(c->image_surf) != allocation->width ||
       cairo_image_surface_get_height(c->image_surf) != allocation->height) {
@@ -144,9 +154,10 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xFF,
         fz_round_rect(fz_transform_rect(page->page_bounds, draw_page_ctm)));
-    // selection rectangle
-    if (c->doci->selection_active || c->doci->selecting) {
-      highlight_selection(c->doci, pixmap, draw_page_ctm);
+    // highlight text selection
+    if ((c->doci->selection_active || c->doci->selecting) &&
+        memcmp(&loc, &c->doci->selection_loc_end, sizeof(fz_location)) <= 0) {
+      highlight_selection(page, pixmap, draw_page_ctm);
     }
     /* fz_run_page(ctx, page->page, draw_device, draw_page_ctm, &cookie); */
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
@@ -158,9 +169,8 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     if (next.chapter == loc.chapter && next.page == loc.page) {
       // end of document
       break;
-    } else {
-      loc = next;
     }
+    loc = next;
     page = get_page(c->doci, loc);
   }
 
@@ -177,8 +187,28 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
     c->doci->selecting = TRUE;
-    c->doci->selection_start =
-        trace_point_to_page(widget, c->doci, fz_make_point(event->x, event->y));
+    fz_point orig_point;
+    trace_point_to_page(widget, c->doci, fz_make_point(event->x, event->y),
+                        &orig_point, &c->doci->selection_loc_start);
+    Page *page = get_page(c->doci, c->doci->selection_loc_start);
+    page->selection_start = orig_point;
+    fprintf(stderr, "start: %3.0f %3.0f\n", page->selection_start.x,
+            page->selection_start.y);
+    gtk_widget_queue_draw(widget);
+    switch (event->type) {
+    case GDK_BUTTON_PRESS:
+      c->doci->selection_mode = FZ_SELECT_CHARS;
+      break;
+    case GDK_2BUTTON_PRESS:
+      c->doci->selection_mode = FZ_SELECT_WORDS;
+      fprintf(stderr, "button 2 press\n");
+      break;
+    case GDK_3BUTTON_PRESS:
+      c->doci->selection_mode = FZ_SELECT_LINES;
+      break;
+    default:
+      fprintf(stderr, "Unhandled button press type\n");
+    }
     break;
   case GDK_BUTTON_MIDDLE:;
     int width = gtk_widget_get_allocated_width(widget);
@@ -190,31 +220,54 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
   return FALSE;
 }
 
+static void complete_selection(GtkWidget *widget, fz_point point) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  fz_point end_point;
+  trace_point_to_page(widget, c->doci, point, &end_point,
+                      &c->doci->selection_loc_end);
+  Page *sel_end_page = get_page(c->doci, c->doci->selection_loc_end);
+  sel_end_page->selection_end = end_point;
+  Page *sel_start_page = get_page(c->doci, c->doci->selection_loc_start);
+  // set all pages between loc_start and loc_and to full selection
+  for (fz_location loc = c->doci->selection_loc_start;
+       memcmp(&loc, &c->doci->selection_loc_end, sizeof(fz_location)) <= 0;
+       loc = fz_next_page(ctx, c->doci->doc, loc)) {
+    Page *page = get_page(c->doci, loc);
+    if (page != sel_start_page) {
+      page->selection_start.x = page->page_bounds.x0;
+      page->selection_start.y = page->page_bounds.y0;
+    }
+    if (page != sel_end_page) {
+      page->selection_end.x = page->page_bounds.x1;
+      page->selection_end.y = page->page_bounds.y1;
+    }
+    fz_snap_selection(ctx, page->page_text, &page->selection_start,
+                      &page->selection_end, c->doci->selection_mode);
+  }
+}
+
 static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   DocInfo *doci = c->doci;
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
     if (doci->selecting) {
+      doci->selecting = FALSE;
+      complete_selection(widget, fz_make_point(event->x, event->y));
       gtk_widget_queue_draw(widget);
     }
-    doci->selecting = FALSE;
-    doci->selection_end =
-        trace_point_to_page(widget, doci, fz_make_point(event->x, event->y));
     doci->selection_active =
-        memcmp(&doci->selection_start, &doci->selection_end,
+        memcmp(&get_page(doci, doci->selection_loc_start)->selection_start,
+               &get_page(doci, doci->selection_loc_end)->selection_end,
                sizeof(fz_point)) != 0;
-
     break;
   }
   return FALSE;
 }
 
 static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
-  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   if (event->state & GDK_BUTTON1_MASK) {
-    c->doci->selection_end =
-        trace_point_to_page(widget, c->doci, fz_make_point(event->x, event->y));
+    complete_selection(widget, fz_make_point(event->x, event->y));
     gtk_widget_queue_draw(widget);
   }
   return FALSE;
@@ -249,7 +302,10 @@ static void scroll(DocInfo *doci, float delta_x, float delta_y) {
  */
 static void zoom_around_point(GtkWidget *widget, DocInfo *doci,
                               float zoom_multiplier, fz_point point) {
-  fz_point original_point_in_page = trace_point_to_page(widget, doci, point);
+  fz_point original_point_in_page;
+  fz_location _original_location;
+  trace_point_to_page(widget, doci, point, &original_point_in_page,
+                      &_original_location);
   doci->zoom *= zoom_multiplier;
   fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
   fz_matrix new_scale_ctm_inv = fz_invert_matrix(new_scale_ctm);

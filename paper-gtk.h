@@ -11,10 +11,11 @@ typedef struct Page {
       view_page_ctm,       // with screen x,y
       view_page_inv_ctm;
   fz_rect page_bounds;
-  fz_location location;
   fz_separations *seps;
   fz_link *links;
   fz_display_list *display_list;
+  fz_point selection_start;
+  fz_point selection_end;
 } Page;
 
 typedef struct DocInfo {
@@ -34,8 +35,9 @@ typedef struct DocInfo {
   int *page_count_for_chapter;
   gboolean selecting;
   gboolean selection_active;
-  fz_point selection_start;
-  fz_point selection_end;
+  fz_location selection_loc_start;
+  fz_location selection_loc_end;
+  int selection_mode; // FZ_SELECT_(CHARS|WORDS|LINES)
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   fz_colorspace *colorspace;
