@@ -277,19 +277,32 @@ static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
  * Move to next/previous pages if scroll.y is past the page bound
  */
 static void scroll_pages(DocInfo *doci) {
+  // move to next pages if scroll.y is past page border
   while (doci->scroll.y >= get_page(doci, doci->location)->page_bounds.y1) {
-    doci->scroll.y -= get_page(doci, doci->location)->page_bounds.y1;
-    doci->location = fz_next_page(ctx, doci->doc, doci->location);
+    fz_location next = fz_next_page(ctx, doci->doc, doci->location);
+    Page *page = get_page(doci, doci->location);
+    if (memcmp(&next, &doci->location, sizeof(next)) == 0) {
+      // end of document
+      doci->scroll.y = page->page_bounds.y1;
+      break;
+    }
+    doci->scroll.y -= page->page_bounds.y1;
+    doci->location = next;
   }
   // move to previous pages if scroll.y is negative
   while (doci->scroll.y < 0) {
-    doci->location = fz_previous_page(ctx, doci->doc, doci->location);
+    fz_location next = fz_previous_page(ctx, doci->doc, doci->location);
+    if (memcmp(&next, &doci->location, sizeof(next)) == 0) {
+      // Beginning of document
+      doci->scroll.y = 0;
+      break;
+    }
+    doci->location = next;
     doci->scroll.y += get_page(doci, doci->location)->page_bounds.y1;
   }
 }
 
 static void scroll(DocInfo *doci, float delta_x, float delta_y) {
-  // TODO don't let scroll.x get out of the page
   doci->scroll.x += delta_x;
   doci->scroll.y += delta_y;
   scroll_pages(doci);
