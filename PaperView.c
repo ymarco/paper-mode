@@ -303,11 +303,17 @@ static void scroll(DocInfo *doci, float delta_x, float delta_y) {
 static void zoom_around_point(GtkWidget *widget, DocInfo *doci,
                               float zoom_multiplier, fz_point point) {
   fz_point original_point_in_page;
-  fz_location _original_location;
+  fz_location original_loc;
   trace_point_to_page(widget, doci, point, &original_point_in_page,
-                      &_original_location);
+                      &original_loc);
+  for (fz_location loc = original_loc;
+       memcmp(&doci->location, &loc, sizeof(loc)) < 0;
+       loc = fz_previous_page(ctx, doci->doc, loc)) {
+    original_point_in_page.y +=
+        get_page(doci, loc)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
+  }
   doci->zoom *= zoom_multiplier;
-  fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, doci->location));
+  fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, original_loc));
   fz_matrix new_scale_ctm_inv = fz_invert_matrix(new_scale_ctm);
   fz_point new_point =
       fz_transform_point(original_point_in_page, new_scale_ctm);
