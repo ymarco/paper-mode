@@ -1,4 +1,5 @@
-CFLAGS = -std=c99 -Wall -Wextra -Wno-unused-parameter -fpic
+CFLAGS = -Wall -Wextra -Wno-unused-parameter -Wshadow
+CFLAGS += -std=c99 -fpic
 CFLAGS += `pkg-config --cflags gtk+-3.0 --libs cairo`
 CFLAGS += -I/usr/local/include
 CFLAGS += -lm

@@ -145,11 +145,11 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
 
   Page *page = &c->doci.pages[loc.chapter][loc.page];
   fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
+  fz_matrix draw_page_ctm;
   fz_point stopped = fz_make_point(-c->doci.scroll.x, -c->doci.scroll.y);
   while (fz_transform_point(stopped, scale_ctm).y < height) {
-    fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
-    fz_matrix draw_page_ctm =
-        fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
+    scale_ctm = get_scale_ctm(&c->doci, page);
+    draw_page_ctm = fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
     // foreground around page boundry
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xFF,
