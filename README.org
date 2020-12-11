@@ -36,3 +36,8 @@ window. Once I have mouse controls and things stabilize I'll embed it into Emacs
   + [ ] pdftotext view
   + [ ] extract/open embedded files
   + [ ] Annotations with text editing through Emacs
+  + [ ] Support for bookmark.el and org-store-link, saving page & scroll & zoom
+  + [ ] Save current page and do accel paths
+  + [ ] Better Epub control, setting CSS and such.
+    Could use htmlize's face-to-css-spec.
+  + [ ] Keybind to show PDF properties
