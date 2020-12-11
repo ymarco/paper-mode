@@ -211,8 +211,6 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
                         &orig_point, &c->doci.selection_loc_start);
     Page *page = get_page(&c->doci, c->doci.selection_loc_start);
     page->selection_start = orig_point;
-    fprintf(stderr, "start: %3.0f %3.0f\n", page->selection_start.x,
-            page->selection_start.y);
     gtk_widget_queue_draw(widget);
     switch (event->type) {
     case GDK_BUTTON_PRESS:
@@ -220,7 +218,6 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
       break;
     case GDK_2BUTTON_PRESS:
       c->doci.selection_mode = FZ_SELECT_WORDS;
-      fprintf(stderr, "button 2 press\n");
       break;
     case GDK_3BUTTON_PRESS:
       c->doci.selection_mode = FZ_SELECT_LINES;
