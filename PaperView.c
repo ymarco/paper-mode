@@ -508,6 +508,11 @@ static void paper_view_init(PaperView *self) {
 }
 
 int main(int argc, char **argv) {
+  if (argc != 2) {
+    fprintf(stderr, "Must supply a file name to open\n");
+    exit(EXIT_FAILURE);
+  }
+  char *filename = argv[1];
   ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
   GtkApplication *app;
   int status;
@@ -520,8 +525,11 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  // fool gtk so it doesn't complain that I didn't register myself as a file opener
+  argc = 0;
+  argv = NULL;
   app = gtk_application_new("org.gtk.example", G_APPLICATION_FLAGS_NONE);
-  g_signal_connect(app, "activate", G_CALLBACK(activate), "./amsmath.pdf");
+  g_signal_connect(app, "activate", G_CALLBACK(activate), filename);
   status = g_application_run(G_APPLICATION(app), argc, argv);
   g_object_unref(app);
   fz_drop_context(ctx);
