@@ -20,23 +20,42 @@ void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
       calloc(sizeof(Page), doci->page_count_for_chapter[chapter]);
 }
 
+void drop_page(Page *page) {
+  if (!page)
+    return;
+  fz_drop_page(ctx, page->page);
+  fz_drop_stext_page(ctx, page->page_text);
+  fz_drop_separations(ctx, page->seps);
+  fz_drop_link(ctx, page->links);
+  fz_drop_display_list(ctx, page->display_list);
+}
+
 void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
   ensure_chapter_is_loaded(doci, location.chapter);
   Page *page = &doci->pages[location.chapter][location.page];
   if (page->page)
     return;
-  page->page =
-      fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
-  page->page_text = fz_new_stext_page_from_page(ctx, page->page, NULL);
-  page->seps = NULL; // TODO seps
-  page->links = fz_load_links(ctx, page->page);
-  page->page_bounds = fz_bound_page(ctx, page->page);
-  page->display_list = fz_new_display_list(ctx, page->page_bounds);
-  // populate display_list
-  fz_device *device = fz_new_list_device(ctx, page->display_list);
-  fz_run_page(ctx, page->page, device, fz_identity, NULL);
-  fz_close_device(ctx, device);
-  fz_drop_device(ctx, device);
+  fz_try(ctx) {
+    page->page =
+        fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
+    page->page_text = fz_new_stext_page_from_page(ctx, page->page, NULL);
+    page->seps = NULL; // TODO seps
+    page->links = fz_load_links(ctx, page->page);
+    page->page_bounds = fz_bound_page(ctx, page->page);
+    page->display_list = fz_new_display_list(ctx, page->page_bounds);
+    // populate display_list
+    fz_device *device = fz_new_list_device(ctx, page->display_list);
+    fz_try(ctx) { fz_run_page(ctx, page->page, device, fz_identity, NULL); }
+    fz_always(ctx) {
+      fz_close_device(ctx, device);
+      fz_drop_device(ctx, device);
+    }
+    fz_catch(ctx) { fz_rethrow(ctx); }
+  }
+  fz_catch(ctx) {
+    drop_page(page);
+    fz_rethrow(ctx);
+  }
 }
 
 Page *get_page(DocInfo *doci, fz_location loc) {
@@ -439,17 +458,6 @@ static void activate(GtkApplication *app, char *filename) {
   gtk_widget_show(GTK_WIDGET(paper));
   gtk_widget_show_all(window);
 }
-
-void drop_page(Page *page) {
-  if (!page)
-    return;
-  fz_drop_stext_page(ctx, page->page_text);
-  fz_drop_separations(ctx, page->seps);
-  fz_drop_link(ctx, page->links);
-  fz_drop_page(ctx, page->page);
-  fz_drop_display_list(ctx, page->display_list);
-}
-
 static void paper_view_finalize(GObject *object) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(object));
   cairo_surface_destroy(c->image_surf);
