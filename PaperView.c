@@ -390,45 +390,38 @@ void load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   if (accel_filename)
     strcpy(doci->accel, accel_filename);
 
-  fz_try(ctx) doci->doc =
-      fz_open_accelerated_document(ctx, doci->filename, doci->accel);
-  fz_catch(ctx) {
-    fprintf(stderr, "cannot open document: %s\n", fz_caught_message(ctx));
-    fz_drop_context(ctx);
-    exit(EXIT_FAILURE);
-  }
+  doci->doc = fz_open_document(ctx, doci->filename);
+  // TODO epubs don't seem to open with fz_open_accelerated_document, even when
+  // the accel filename is NULL.
+  /* doci->doc = fz_open_accelerated_document(ctx, doci->filename, doci->accel); */
   fz_location loc = {0, 0};
   doci->location = loc;
   doci->colorspace = fz_device_rgb(ctx);
   doci->zoom = 100.0f;
   /* Count the number of pages. */
-  fz_try(ctx) {
-    doci->chapter_count = fz_count_chapters(ctx, doci->doc);
-    if (!(doci->pages = calloc(sizeof(Page *), doci->chapter_count))) {
-      fz_throw(ctx, 1, "Can't allocate");
-    }
-    if (!(doci->page_count_for_chapter =
-              calloc(sizeof(int *), doci->chapter_count))) {
-      fz_throw(ctx, 1, "Can't allocate");
-    }
+  doci->chapter_count = fz_count_chapters(ctx, doci->doc);
+  if (!(doci->pages = calloc(sizeof(Page *), doci->chapter_count))) {
+    fz_throw(ctx, 1, "Can't allocate");
   }
-  fz_catch(ctx) {
-    fprintf(stderr, "cannot count number of pages: %s\n",
-            fz_caught_message(ctx));
-    fz_drop_document(ctx, doci->doc);
-    fz_drop_context(ctx);
-    exit(EXIT_FAILURE);
+  if (!(doci->page_count_for_chapter =
+            calloc(sizeof(int *), doci->chapter_count))) {
+    fz_throw(ctx, 1, "Can't allocate");
   }
 }
 
 PaperView *paper_view_new(char *filename, char *accel_filename) {
   GObject *ret = g_object_new(TYPE_PAPER_VIEW, NULL);
   if (ret == NULL) {
+    fprintf(stderr, "paper_view_new: can't allocate\n");
     return NULL;
   }
   PaperView *widget = PAPER_VIEW(ret);
   PaperViewPrivate *c = paper_view_get_instance_private(widget);
-  load_doc(&c->doci, filename, accel_filename);
+  fz_try(ctx) { load_doc(&c->doci, filename, accel_filename); }
+  fz_catch(ctx) {
+    fprintf(stderr, "paper_view_new: could not open %s\n", filename);
+    return NULL;
+  }
   c->has_mouse_event = FALSE;
   return PAPER_VIEW(ret);
 }
@@ -438,6 +431,9 @@ static void activate(GtkApplication *app, char *filename) {
   gtk_window_set_title(GTK_WINDOW(window), "Window");
   gtk_window_set_default_size(GTK_WINDOW(window), 900, 900);
   PaperView *paper = paper_view_new(filename, NULL);
+  if (!paper) {
+    exit(EXIT_FAILURE);
+  }
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(paper));
 
   gtk_widget_show(GTK_WIDGET(paper));
