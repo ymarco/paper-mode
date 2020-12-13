@@ -7,7 +7,6 @@
 #include <gtk/gtk.h>
 
 static fz_context *ctx;
-const int PAGE_SEPARATOR_HEIGHT = 18;
 
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
@@ -84,7 +83,7 @@ static void trace_point_to_page(GtkWidget *widget, DocInfo *doci,
     *res = fz_transform_point(point, draw_page_inv);
     stopped.y += page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
     page = get_page(doci, *loc);
-    if (res->y < page->page_bounds.y1) {
+    if (res->y < page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT) {
       break;
     }
     *loc = fz_next_page(ctx, doci->doc, *loc);
@@ -294,7 +293,8 @@ static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
  */
 static void scroll_pages(DocInfo *doci) {
   // move to next pages if scroll.y is past page border
-  while (doci->scroll.y >= get_page(doci, doci->location)->page_bounds.y1) {
+  while (doci->scroll.y >= get_page(doci, doci->location)->page_bounds.y1 +
+                               PAGE_SEPARATOR_HEIGHT) {
     fz_location next = fz_next_page(ctx, doci->doc, doci->location);
     Page *page = get_page(doci, doci->location);
     if (memcmp(&next, &doci->location, sizeof(next)) == 0) {
@@ -302,7 +302,7 @@ static void scroll_pages(DocInfo *doci) {
       doci->scroll.y = page->page_bounds.y1;
       break;
     }
-    doci->scroll.y -= page->page_bounds.y1;
+    doci->scroll.y -= page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
     doci->location = next;
   }
   // move to previous pages if scroll.y is negative
@@ -314,7 +314,8 @@ static void scroll_pages(DocInfo *doci) {
       break;
     }
     doci->location = next;
-    doci->scroll.y += get_page(doci, doci->location)->page_bounds.y1;
+    doci->scroll.y +=
+        get_page(doci, doci->location)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
   }
 }
 

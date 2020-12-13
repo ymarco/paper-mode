@@ -18,6 +18,8 @@ typedef struct Page {
   fz_point selection_end;
 } Page;
 
+const int PAGE_SEPARATOR_HEIGHT = 18;
+
 typedef struct DocInfo {
   fz_document *doc;
   fz_location location;
@@ -28,8 +30,9 @@ typedef struct DocInfo {
   float rotate; // in degrees
   /* pages[location.chapter][location.page] = page */
   Page **pages;
-  /* 0 <= scroll <= pages[location.chapter][location.page].page_bounds.y1 */
-  /* scroll is always inside the current page bounds */
+  /* 0 <= scroll.y <= get_page(doci, doci.location).page_bounds.y1 +
+   * PAGE_SEPARATOR_HEIGHT*/
+  /* scroll is always relative to current page bounds */
   fz_point scroll;
   int chapter_count;
   int *page_count_for_chapter;
