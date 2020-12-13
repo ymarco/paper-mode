@@ -37,7 +37,10 @@ window. Once I have mouse controls and things stabilize I'll embed it into Emacs
   + [ ] extract/open embedded files
   + [ ] Annotations with text editing through Emacs
   + [ ] Support for bookmark.el and org-store-link, saving page & scroll & zoom
-  + [ ] Save current page and do accel paths
-  + [ ] Better Epub control, setting CSS and such.
+  + [ ] Accel files
+  + [ ] Better Epub control, generate CSS mimicknig the Emacs theme.
     Could use htmlize's face-to-css-spec.
   + [ ] Keybind to show PDF properties
+  + [ ] Save scrolled document location to restore it on future openings
+  + [ ] Figure out if I could map long key presses from Emacs to scroll smoothly
+    continously
