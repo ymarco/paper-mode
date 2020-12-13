@@ -7,14 +7,12 @@
 typedef struct PageRenderCache {
   fz_quad *selection_quads; // allocated on demand by complete_selection()
   int selection_quads_count;
+  fz_link *highlighted_link;
 } PageRenderCache;
 
 typedef struct Page {
   fz_page *page;
   fz_stext_page *page_text;
-  fz_matrix draw_page_ctm, // zoom, rotation, no screen x,y
-      view_page_ctm,       // with screen x,y
-      view_page_inv_ctm;
   fz_rect page_bounds;
   fz_separations *seps;
   fz_link *links;
