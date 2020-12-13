@@ -374,19 +374,29 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
     zoom_around_point(widget, &c->doci, multiplier,
                       fz_make_point(event->x, event->y));
   } else { // scroll
-    fz_point d = {0,0};
+    int w = gtk_widget_get_allocated_width(widget);
+    int h = gtk_widget_get_allocated_height(widget);
+    // scroll 10% of window pixels
+    float multiplier = 0.10;
+    Page *page = get_page(&c->doci, c->doci.location);
+    // don't include rotation
+    fz_matrix scale_ctm = fz_transform_page(page->page_bounds, c->doci.zoom, 0);
+    fz_matrix scale_ctm_inv = fz_invert_matrix(scale_ctm);
+    fz_point scrolled = fz_transform_point(
+        fz_make_point(multiplier * w, multiplier * h), scale_ctm_inv);
+    fz_point d = {0, 0};
     switch (event->direction) {
     case GDK_SCROLL_UP:
-      d.y = -50;
+      d.y = -scrolled.y;
       break;
     case GDK_SCROLL_DOWN:
-      d.y = 50;
+      d.y = scrolled.y;
       break;
     case GDK_SCROLL_LEFT:
-      d.x = -50;
+      d.x = -scrolled.x;
       break;
     case GDK_SCROLL_RIGHT:
-      d.x = 50;
+      d.x = scrolled.x;
       break;
     case GDK_SCROLL_SMOOTH:
       d.x = event->delta_x;
