@@ -17,10 +17,10 @@ window. Once I have mouse controls and things stabilize I'll embed it into Emacs
   + [-] Mouse:
     - [ ] Smooth scrolling like Evince has
     - [X] Select text over multiple pages
-    - [ ] Links:
-      + [ ] Highlight on hover
+    - [-] Links:
+      + [X] Highlight on hover
       + [ ] Show destination in a mousce hover popup kinda thing
-      + [ ] Follow on click
+      + [X] Follow on click
   + [ ] Lazy load page text
   + [ ] Pre render next pages and free previous pages
   + [ ] Synctex
