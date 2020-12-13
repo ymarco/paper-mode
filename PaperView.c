@@ -319,9 +319,9 @@ static void scroll_pages(DocInfo *doci) {
   }
 }
 
-static void scroll(DocInfo *doci, float delta_x, float delta_y) {
-  doci->scroll.x += delta_x;
-  doci->scroll.y += delta_y;
+static void scroll(DocInfo *doci, fz_point delta) {
+  doci->scroll.x += delta.x;
+  doci->scroll.y += delta.y;
   scroll_pages(doci);
 }
 
@@ -374,27 +374,27 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
     zoom_around_point(widget, &c->doci, multiplier,
                       fz_make_point(event->x, event->y));
   } else { // scroll
-    float d_x = 0.0f, d_y = 0.0f;
+    fz_point d = {0,0};
     switch (event->direction) {
     case GDK_SCROLL_UP:
-      d_y = -50;
+      d.y = -50;
       break;
     case GDK_SCROLL_DOWN:
-      d_y = 50;
+      d.y = 50;
       break;
     case GDK_SCROLL_LEFT:
-      d_x = -50;
+      d.x = -50;
       break;
     case GDK_SCROLL_RIGHT:
-      d_x = 50;
+      d.x = 50;
       break;
     case GDK_SCROLL_SMOOTH:
-      d_x = event->delta_x;
-      d_y = event->delta_y;
+      d.x = event->delta_x;
+      d.y = event->delta_y;
       fprintf(stderr, "Smooth scroll\n");
       break;
     }
-    scroll(&c->doci, d_x, d_y);
+    scroll(&c->doci, d);
   }
   gtk_widget_queue_draw(widget);
   return FALSE;
