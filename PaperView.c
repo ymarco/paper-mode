@@ -167,6 +167,13 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
         memcmp(&loc, &c->doci.selection_loc_end, sizeof(fz_location)) <= 0) {
       highlight_selection(page, pixmap, draw_page_ctm);
     }
+    // highlight selected link
+    if (page->cache.highlighted_link) {
+      fz_clear_pixmap_rect_with_value(
+          ctx, pixmap, 0xD0,
+          fz_round_rect(fz_transform_rect(page->cache.highlighted_link->rect,
+                                          draw_page_ctm)));
+    }
     /* fz_run_page(ctx, page->page, draw_device, draw_page_ctm, &cookie); */
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
                         page->page_bounds, NULL);
@@ -257,6 +264,33 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
   }
 }
 
+/*
+ * Update cache.highlighted_link on the page below mouse_point.
+ * Return TRUE if the link was updated.
+ */
+static gboolean update_highlighted_link(GtkWidget *widget,
+                                        fz_point mouse_point) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  fz_point mouse_page_point;
+  fz_location mouse_page_loc;
+  trace_point_to_page(widget, &c->doci, mouse_point, &mouse_page_point,
+                      &mouse_page_loc);
+  Page *page = get_page(&c->doci, mouse_page_loc);
+  fz_link *found = NULL;
+  for (fz_link *link = page->links; link != NULL; link = link->next) {
+    if (fz_is_point_inside_rect(mouse_page_point, link->rect)) {
+      found = link;
+      break;
+    }
+  }
+  // no intersecting link found
+  if (found != page->cache.highlighted_link) {
+    page->cache.highlighted_link = found;
+    return TRUE;
+  }
+  return FALSE;
+}
+
 static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   DocInfo *doci = &c->doci;
@@ -280,6 +314,11 @@ static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
   if (event->state & GDK_BUTTON1_MASK) { // selecting
     complete_selection(widget, fz_make_point(event->x, event->y));
     gtk_widget_queue_draw(widget);
+  } else {
+    if (update_highlighted_link(widget, fz_make_point(event->x, event->y))) {
+      fprintf(stderr, "updating link\n");
+      gtk_widget_queue_draw(widget);
+    }
   }
   return FALSE;
 }
@@ -402,6 +441,7 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
     }
     scroll(&c->doci, d);
   }
+  update_highlighted_link(widget, fz_make_point(event->x, event->y));
   gtk_widget_queue_draw(widget);
   return FALSE;
 }
