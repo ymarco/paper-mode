@@ -4,6 +4,11 @@
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h> /* for pdf specifics and forms */
 
+typedef struct PageRenderCache {
+  fz_quad *selection_quads; // allocated on demand by complete_selection()
+  int selection_quads_count;
+} PageRenderCache;
+
 typedef struct Page {
   fz_page *page;
   fz_stext_page *page_text;
@@ -16,6 +21,7 @@ typedef struct Page {
   fz_display_list *display_list;
   fz_point selection_start;
   fz_point selection_end;
+  PageRenderCache cache;
 } Page;
 
 const int PAGE_SEPARATOR_HEIGHT = 18;

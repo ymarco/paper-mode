@@ -27,6 +27,7 @@ void drop_page(Page *page) {
   fz_drop_separations(ctx, page->seps);
   fz_drop_link(ctx, page->links);
   fz_drop_display_list(ctx, page->display_list);
+  free(page->cache.selection_quads);
 }
 
 void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
@@ -106,14 +107,8 @@ static void center_page(int surface_width, DocInfo *doci) {
 }
 
 static void highlight_selection(Page *page, fz_pixmap *pixmap, fz_matrix ctm) {
-  const int hl_count = 2048;
-  // TODO cache hl when selection doesn't change?
-  fz_quad hl[hl_count];
-  int hits_count =
-      fz_highlight_selection(ctx, page->page_text, page->selection_start,
-                             page->selection_end, hl, hl_count);
-  for (int i = 0; i < hits_count; i++) {
-    fz_quad box = fz_transform_quad(hl[i], ctm);
+  for (int i = 0; i < page->cache.selection_quads_count; i++) {
+    fz_quad box = fz_transform_quad(page->cache.selection_quads[i], ctm);
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xE8,
         fz_round_rect(fz_make_rect(box.ul.x, box.ul.y, box.lr.x, box.lr.y)));
@@ -258,6 +253,12 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
     }
     fz_snap_selection(ctx, page->page_text, &page->selection_start,
                       &page->selection_end, c->doci.selection_mode);
+
+    int max_quads_count = 1024;
+    page->cache.selection_quads = malloc(max_quads_count * sizeof(fz_quad));
+    page->cache.selection_quads_count = fz_highlight_selection(
+        ctx, page->page_text, page->selection_start, page->selection_end,
+        page->cache.selection_quads, max_quads_count);
   }
 }
 
@@ -281,7 +282,7 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
 }
 
 static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
-  if (event->state & GDK_BUTTON1_MASK) {
+  if (event->state & GDK_BUTTON1_MASK) { // selecting
     complete_selection(widget, fz_make_point(event->x, event->y));
     gtk_widget_queue_draw(widget);
   }
