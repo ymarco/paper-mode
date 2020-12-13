@@ -326,8 +326,8 @@ static void scroll(DocInfo *doci, fz_point delta) {
  * point in the bounds of WIDGET) stays on the same pixel as it did before
  * adjusting the zoom.
  */
-static void zoom_around_point(GtkWidget *widget, DocInfo *doci,
-                              float zoom_multiplier, fz_point point) {
+static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
+                              fz_point point) {
   fz_point original_point_in_page;
   fz_location original_loc;
   trace_point_to_page(widget, doci, point, &original_point_in_page,
@@ -338,7 +338,7 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci,
     original_point_in_page.y +=
         get_page(doci, loc)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
   }
-  doci->zoom *= zoom_multiplier;
+  doci->zoom = new_zoom;
   fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, original_loc));
   fz_matrix new_scale_ctm_inv = fz_invert_matrix(new_scale_ctm);
   fz_point new_point =
@@ -367,7 +367,7 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
     default:
       fprintf(stderr, "unhandled zoom scroll case\n");
     }
-    zoom_around_point(widget, &c->doci, multiplier,
+    zoom_around_point(widget, &c->doci, c->doci.zoom * multiplier,
                       fz_make_point(event->x, event->y));
   } else { // scroll
     int w = gtk_widget_get_allocated_width(widget);
