@@ -150,16 +150,11 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
 
   fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
   fz_location loc = c->doci.location;
-  fz_try(ctx) { ensure_page_is_loaded(&c->doci, loc); }
-  fz_catch(ctx) {
-    fprintf(stderr, "can't load page");
-    exit(EXIT_FAILURE);
-  }
-
-  Page *page = &c->doci.pages[loc.chapter][loc.page];
+  Page *page = get_page(&c->doci, loc);
   fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
   fz_matrix draw_page_ctm;
   fz_point stopped = fz_make_point(-c->doci.scroll.x, -c->doci.scroll.y);
+
   while (fz_transform_point(stopped, scale_ctm).y < height) {
     scale_ctm = get_scale_ctm(&c->doci, page);
     draw_page_ctm = fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
