@@ -301,10 +301,26 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
       complete_selection(widget, fz_make_point(event->x, event->y));
       gtk_widget_queue_draw(widget);
     }
-    doci->selection_active =
-        memcmp(&get_page(doci, doci->selection_loc_start)->selection_start,
+    if (memcmp(&get_page(doci, doci->selection_loc_start)->selection_start,
                &get_page(doci, doci->selection_loc_end)->selection_end,
-               sizeof(fz_point)) != 0;
+               sizeof(fz_point)) != 0) {
+      doci->selection_active = TRUE;
+    } else {
+      doci->selection_active = FALSE;
+
+      fz_point mouse_point = {event->x, event->y};
+      fz_point mouse_page_point;
+      fz_location mouse_page_loc;
+      trace_point_to_page(widget, &c->doci, mouse_point, &mouse_page_point,
+                          &mouse_page_loc);
+      Page *page = get_page(&c->doci, mouse_page_loc);
+      fz_link *link = page->cache.highlighted_link;
+      if (link != NULL) {
+        // TODO follow non-internal links
+        doci->location = fz_resolve_link(ctx, doci->doc, link->uri,
+                                         &doci->scroll.x, &doci->scroll.y);
+      }
+    }
     break;
   }
   return FALSE;
