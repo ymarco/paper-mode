@@ -323,6 +323,8 @@ static gboolean query_tooltip(GtkWidget *widget, int x, int y,
   } else {
     float _x, _y;
     fz_location loc = fz_resolve_link(ctx, c->doci.doc, link->uri, &_x, &_y);
+    // TODO display the label of the page instead the absolute number. I'm not
+    // sure its possible in mupdf though.
     if (c->doci.chapter_count > 1)
       if (c->doci.location.chapter == loc.chapter)
         snprintf(text, sizeof(text), "↪Page %d in current chapter", loc.page);
@@ -520,7 +522,8 @@ void load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   doci->doc = fz_open_document(ctx, doci->filename);
   // TODO epubs don't seem to open with fz_open_accelerated_document, even when
   // the accel filename is NULL.
-  /* doci->doc = fz_open_accelerated_document(ctx, doci->filename, doci->accel); */
+  /* doci->doc = fz_open_accelerated_document(ctx, doci->filename, doci->accel);
+   */
   fz_location loc = {0, 0};
   doci->location = loc;
   doci->colorspace = fz_device_rgb(ctx);
@@ -543,7 +546,6 @@ PaperView *paper_view_new(char *filename, char *accel_filename) {
     return NULL;
   }
   PaperView *widget = PAPER_VIEW(ret);
-  gtk_widget_set_has_tooltip(GTK_WIDGET(widget), TRUE);
   PaperViewPrivate *c = paper_view_get_instance_private(widget);
   fz_try(ctx) { load_doc(&c->doci, filename, accel_filename); }
   fz_catch(ctx) {
@@ -620,6 +622,7 @@ static void paper_view_init(PaperView *self) {
                             GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
                             GDK_POINTER_MOTION_MASK |
                             GDK_POINTER_MOTION_HINT_MASK | GDK_SCROLL_MASK);
+  gtk_widget_set_has_tooltip(GTK_WIDGET(self), TRUE);
 }
 
 int main(int argc, char **argv) {
@@ -640,7 +643,8 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  // fool gtk so it doesn't complain that I didn't register myself as a file opener
+  // fool gtk so it doesn't complain that I didn't register myself as a file
+  // opener
   argc = 0;
   argv = NULL;
   app = gtk_application_new("org.gtk.example", G_APPLICATION_FLAGS_NONE);
