@@ -55,6 +55,8 @@ typedef struct _PaperViewPrivate {
   cairo_surface_t *image_surf;
   GdkEventButton mouse_event;
   gboolean has_mouse_event;
+  GdkCursor *default_cursor;
+  GdkCursor *click_cursor;
 } PaperViewPrivate;
 
 typedef struct _PaperView {

@@ -264,13 +264,24 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
   }
 }
 
+// TODO actually run this on realize
+static gboolean configure_event(GtkWidget *widget, GdkEventConfigure *event) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  GdkDisplay *display = gtk_widget_get_display(widget);
+  c->default_cursor = gdk_cursor_new_from_name(display, "default");
+  c->click_cursor = gdk_cursor_new_from_name(display, "pointer");
+  return FALSE;
+}
+
 /*
  * Update cache.highlighted_link on the page below mouse_point.
  * Return TRUE if the link was updated.
+ * Also set the gdk mouse cursor in the correct shape.
  */
 static gboolean update_highlighted_link(GtkWidget *widget,
                                         fz_point mouse_point) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  GdkCursor *cursor = c->default_cursor;
   fz_point mouse_page_point;
   fz_location mouse_page_loc;
   trace_point_to_page(widget, &c->doci, mouse_point, &mouse_page_point,
@@ -280,12 +291,14 @@ static gboolean update_highlighted_link(GtkWidget *widget,
   for (fz_link *link = page->links; link != NULL; link = link->next) {
     if (fz_is_point_inside_rect(mouse_page_point, link->rect)) {
       found = link;
+      cursor = c->click_cursor;
       break;
     }
   }
   // no intersecting link found
   if (found != page->cache.highlighted_link) {
     page->cache.highlighted_link = found;
+    gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
     return TRUE;
   }
   return FALSE;
@@ -319,6 +332,10 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
         // TODO follow non-internal links
         doci->location = fz_resolve_link(ctx, doci->doc, link->uri,
                                          &doci->scroll.x, &doci->scroll.y);
+        // set back cursor. update_highlighted_link won't reset it since from
+        // its perspective the selected link did not change on the
+        // newly-followed page
+        gdk_window_set_cursor(gtk_widget_get_window(widget), c->default_cursor);
       }
     }
     break;
@@ -332,7 +349,6 @@ static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
     gtk_widget_queue_draw(widget);
   } else {
     if (update_highlighted_link(widget, fz_make_point(event->x, event->y))) {
-      fprintf(stderr, "updating link\n");
       gtk_widget_queue_draw(widget);
     }
   }
@@ -549,6 +565,7 @@ static void paper_view_class_init(PaperViewClass *class) {
   widget_class->motion_notify_event = motion_notify_event;
   widget_class->button_release_event = button_release_event;
   widget_class->scroll_event = scroll_event;
+  widget_class->configure_event = configure_event;
   /* widget_class->leave_notify_event   = cb_zathura_page_widget_leave_notify;
    */
   /* widget_class->popup_menu           = cb_zathura_page_widget_popup_menu; */
