@@ -295,13 +295,45 @@ static gboolean update_highlighted_link(GtkWidget *widget,
       break;
     }
   }
-  // no intersecting link found
   if (found != page->cache.highlighted_link) {
     page->cache.highlighted_link = found;
     gdk_window_set_cursor(gtk_widget_get_window(widget), cursor);
     return TRUE;
   }
   return FALSE;
+}
+
+static gboolean query_tooltip(GtkWidget *widget, int x, int y,
+                              gboolean keyboard_mode, GtkTooltip *tooltip) {
+  if (keyboard_mode)
+    return FALSE;
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  fz_point mouse_point = {x, y};
+  fz_point mouse_page_point;
+  fz_location mouse_page_loc;
+  trace_point_to_page(widget, &c->doci, mouse_point, &mouse_page_point,
+                      &mouse_page_loc);
+  fz_link *link = get_page(&c->doci, mouse_page_loc)->cache.highlighted_link;
+  if (!link)
+    return FALSE;
+
+  gchar text[PATH_MAX + 4]; // 4 for unicode link symbol
+  if (fz_is_external_link(ctx, link->uri)) {
+    snprintf(text, sizeof(text), "↪%s", link->uri);
+  } else {
+    float _x, _y;
+    fz_location loc = fz_resolve_link(ctx, c->doci.doc, link->uri, &_x, &_y);
+    if (c->doci.chapter_count > 1)
+      if (c->doci.location.chapter == loc.chapter)
+        snprintf(text, sizeof(text), "↪Page %d in current chapter", loc.page);
+      else
+        snprintf(text, sizeof(text), "↪Chapter %d, page %d", loc.chapter,
+                 loc.page);
+    else
+      snprintf(text, sizeof(text), "↪Page %d", loc.page);
+  }
+  gtk_tooltip_set_text(tooltip, text);
+  return TRUE;
 }
 
 static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
@@ -511,6 +543,7 @@ PaperView *paper_view_new(char *filename, char *accel_filename) {
     return NULL;
   }
   PaperView *widget = PAPER_VIEW(ret);
+  gtk_widget_set_has_tooltip(GTK_WIDGET(widget), TRUE);
   PaperViewPrivate *c = paper_view_get_instance_private(widget);
   fz_try(ctx) { load_doc(&c->doci, filename, accel_filename); }
   fz_catch(ctx) {
@@ -566,6 +599,7 @@ static void paper_view_class_init(PaperViewClass *class) {
   widget_class->button_release_event = button_release_event;
   widget_class->scroll_event = scroll_event;
   widget_class->configure_event = configure_event;
+  widget_class->query_tooltip = query_tooltip;
   /* widget_class->leave_notify_event   = cb_zathura_page_widget_leave_notify;
    */
   /* widget_class->popup_menu           = cb_zathura_page_widget_popup_menu; */

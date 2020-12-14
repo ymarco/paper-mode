@@ -19,8 +19,8 @@ window. Once I have mouse controls and things stabilize I'll embed it into Emacs
     - [X] Select text over multiple pages
     - [-] Links:
       + [X] Highlight on hover
-      + [ ] Show destination in a mousce hover popup kinda thing
-      + [X] Follow on click
+      + [X] Show destination in a mousce hover popup kinda thing
+      + [-] Follow on click - works only on internal links
   + [ ] Lazy load page text
   + [ ] Pre render next pages and free previous pages
   + [ ] Synctex
