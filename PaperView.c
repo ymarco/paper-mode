@@ -287,6 +287,11 @@ static gboolean update_highlighted_link(GtkWidget *widget,
   trace_point_to_page(widget, &c->doci, mouse_point, &mouse_page_point,
                       &mouse_page_loc);
   Page *page = get_page(&c->doci, mouse_page_loc);
+  // skip altogether if point stayed in the same link area as before
+  if (page->cache.highlighted_link &&
+      fz_is_point_inside_rect(mouse_page_point,
+                              page->cache.highlighted_link->rect))
+    return FALSE;
   fz_link *found = NULL;
   for (fz_link *link = page->links; link != NULL; link = link->next) {
     if (fz_is_point_inside_rect(mouse_page_point, link->rect)) {
