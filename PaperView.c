@@ -6,11 +6,10 @@
 #include "PaperView.h"
 #include <gtk/gtk.h>
 
-static fz_context *ctx;
-
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
 void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
+  fz_context *ctx = doci->ctx;
   if (doci->pages[chapter])
     return;
   doci->page_count_for_chapter[chapter] =
@@ -19,7 +18,7 @@ void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
       calloc(sizeof(Page), doci->page_count_for_chapter[chapter]);
 }
 
-void drop_page(Page *page) {
+void drop_page(fz_context *ctx, Page *page) {
   if (!page)
     return;
   fz_drop_page(ctx, page->page);
@@ -32,6 +31,7 @@ void drop_page(Page *page) {
 
 void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
   ensure_chapter_is_loaded(doci, location.chapter);
+  fz_context *ctx = doci->ctx;
   Page *page = &doci->pages[location.chapter][location.page];
   if (page->page)
     return;
@@ -53,11 +53,12 @@ void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
     fz_catch(ctx) { fz_rethrow(ctx); }
   }
   fz_catch(ctx) {
-    drop_page(page);
+    drop_page(ctx, page);
     fz_rethrow(ctx);
   }
 }
 
+// TODO handle exceptions wherever get_page is used
 Page *get_page(DocInfo *doci, fz_location loc) {
   ensure_page_is_loaded(doci, loc);
   return &doci->pages[loc.chapter][loc.page];
@@ -74,6 +75,7 @@ static void trace_point_to_page(GtkWidget *widget, DocInfo *doci,
                                 fz_point point, fz_point *res,
                                 fz_location *loc) {
   *loc = doci->location;
+  fz_context *ctx = doci->ctx;
   fz_point stopped = fz_make_point(-doci->scroll.x, -doci->scroll.y);
   Page *page = get_page(doci, *loc);
   while (1) {
@@ -106,7 +108,8 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
-static void highlight_selection(Page *page, fz_pixmap *pixmap, fz_matrix ctm) {
+static void highlight_selection(fz_context *ctx, Page *page, fz_pixmap *pixmap,
+                                fz_matrix ctm) {
   for (int i = 0; i < page->cache.selection_quads_count; i++) {
     fz_quad box = fz_transform_quad(page->cache.selection_quads[i], ctm);
     fz_clear_pixmap_rect_with_value(
@@ -130,6 +133,7 @@ static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
 
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  fz_context *ctx = c->doci.ctx;
   GdkRectangle rec = {.width = gtk_widget_get_allocated_width(widget),
                       .height = gtk_widget_get_allocated_height(widget)};
   allocate_pixmap(widget, &rec);
@@ -143,12 +147,21 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
 
   fz_irect whole_rect = {.x1 = width, .y1 = height};
 
-  fz_pixmap *pixmap = fz_new_pixmap_with_bbox_and_data(
-      ctx, c->doci.colorspace, whole_rect, NULL, 1, image);
-  // background
-  fz_clear_pixmap_with_value(ctx, pixmap, 0xF0);
+  fz_pixmap *pixmap = NULL;
+  fz_device *draw_device = NULL;
+  fz_try(ctx) {
 
-  fz_device *draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
+    pixmap = fz_new_pixmap_with_bbox_and_data(ctx, c->doci.colorspace,
+                                              whole_rect, NULL, 1, image);
+    fz_clear_pixmap_with_value(ctx, pixmap, 0xF0);
+    draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
+  }
+  fz_catch(ctx) {
+    fprintf(stderr, "Failed allocations: %s\n", fz_caught_message(ctx));
+    return FALSE;
+  }
+  // background
+
   fz_location loc = c->doci.location;
   Page *page = get_page(&c->doci, loc);
   fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
@@ -165,7 +178,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     // highlight text selection
     if ((c->doci.selection_active || c->doci.selecting) &&
         memcmp(&loc, &c->doci.selection_loc_end, sizeof(fz_location)) <= 0) {
-      highlight_selection(page, pixmap, draw_page_ctm);
+      highlight_selection(ctx, page, pixmap, draw_page_ctm);
     }
     // highlight selected link
     if (page->cache.highlighted_link) {
@@ -234,6 +247,7 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
 
 static void complete_selection(GtkWidget *widget, fz_point point) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  fz_context *ctx = c->doci.ctx;
   fz_point end_point;
   trace_point_to_page(widget, &c->doci, point, &end_point,
                       &c->doci.selection_loc_end);
@@ -313,6 +327,7 @@ static gboolean query_tooltip(GtkWidget *widget, int x, int y,
   if (keyboard_mode)
     return FALSE;
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  fz_context *ctx = c->doci.ctx;
   fz_point mouse_point = {x, y};
   fz_point mouse_page_point;
   fz_location mouse_page_loc;
@@ -346,6 +361,7 @@ static gboolean query_tooltip(GtkWidget *widget, int x, int y,
 static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   DocInfo *doci = &c->doci;
+  fz_context *ctx = doci->ctx;
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
     if (doci->selecting) {
@@ -399,6 +415,7 @@ static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
  */
 static void scroll_pages(DocInfo *doci) {
   // move to next pages if scroll.y is past page border
+  fz_context *ctx = doci->ctx;
   while (doci->scroll.y >= get_page(doci, doci->location)->page_bounds.y1 +
                                PAGE_SEPARATOR_HEIGHT) {
     fz_location next = fz_next_page(ctx, doci->doc, doci->location);
@@ -438,6 +455,7 @@ static void scroll(DocInfo *doci, fz_point delta) {
  */
 static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
                               fz_point point) {
+  fz_context *ctx = doci->ctx;
   fz_point original_point_in_page;
   fz_location original_loc;
   trace_point_to_page(widget, doci, point, &original_point_in_page,
@@ -517,18 +535,34 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
   return FALSE;
 }
 
-void load_doc(DocInfo *doci, char *filename, char *accel_filename) {
+int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // zero it all out - the short way of setting everything to NULL.
   memset(doci, 0, sizeof(*doci));
+  fz_context *ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
+  doci->ctx = ctx;
+
+  fz_try(ctx) { fz_register_document_handlers(ctx); }
+  fz_catch(ctx) {
+    fprintf(stderr, "cannot register document handlers: %s\n",
+            fz_caught_message(ctx));
+    fz_drop_context(ctx);
+    return 1;
+  }
   strcpy(doci->filename, filename);
   if (accel_filename)
     strcpy(doci->accel, accel_filename);
 
-  doci->doc = fz_open_document(ctx, doci->filename);
-  // TODO epubs don't seem to open with fz_open_accelerated_document, even when
-  // the accel filename is NULL.
-  /* doci->doc = fz_open_accelerated_document(ctx, doci->filename, doci->accel);
-   */
+  fz_try(ctx) {
+    doci->doc = fz_open_document(ctx, doci->filename);
+    // TODO epubs don't seem to open with fz_open_accelerated_document, even
+    // when the accel filename is NULL.
+    /* doci->doc = fz_open_accelerated_document(ctx, doci->filename,
+     * doci->accel); */
+  }
+  fz_catch(ctx) {
+    fz_drop_context(ctx);
+    return 0;
+  }
   fz_location loc = {0, 0};
   doci->location = loc;
   doci->colorspace = fz_device_rgb(ctx);
@@ -536,12 +570,16 @@ void load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   /* Count the number of pages. */
   doci->chapter_count = fz_count_chapters(ctx, doci->doc);
   if (!(doci->pages = calloc(sizeof(Page *), doci->chapter_count))) {
-    fz_throw(ctx, 1, "Can't allocate");
+    fz_drop_context(ctx);
+    return 0;
   }
   if (!(doci->page_count_for_chapter =
             calloc(sizeof(int *), doci->chapter_count))) {
-    fz_throw(ctx, 1, "Can't allocate");
+    fz_drop_context(ctx);
+    free(doci->pages);
+    return 0;
   }
+  return 1;
 }
 
 PaperView *paper_view_new(char *filename, char *accel_filename) {
@@ -552,8 +590,7 @@ PaperView *paper_view_new(char *filename, char *accel_filename) {
   }
   PaperView *widget = PAPER_VIEW(ret);
   PaperViewPrivate *c = paper_view_get_instance_private(widget);
-  fz_try(ctx) { load_doc(&c->doci, filename, accel_filename); }
-  fz_catch(ctx) {
+  if (!load_doc(&c->doci, filename, accel_filename)) {
     fprintf(stderr, "paper_view_new: could not open %s\n", filename);
     return NULL;
   }
@@ -576,13 +613,14 @@ static void activate(GtkApplication *app, char *filename) {
 }
 static void paper_view_finalize(GObject *object) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(object));
+  fz_context *ctx = c->doci.ctx;
   cairo_surface_destroy(c->image_surf);
   Page *chapter_pages;
   for (int chapter = 0; chapter < c->doci.chapter_count; chapter++) {
     chapter_pages = c->doci.pages[chapter];
     if (chapter_pages) {
       for (int page = 0; page < c->doci.page_count_for_chapter[chapter]; page++)
-        drop_page(&chapter_pages[page]);
+        drop_page(ctx, &chapter_pages[page]);
       free(chapter_pages);
     }
   }
@@ -592,6 +630,7 @@ static void paper_view_finalize(GObject *object) {
   pdf_drop_annot(ctx, c->doci.selected_annot);
   free(c->doci.pages);
   free(c->doci.page_count_for_chapter);
+  fz_drop_context(c->doci.ctx);
   G_OBJECT_CLASS(paper_view_parent_class)->finalize(object);
 }
 
@@ -636,17 +675,8 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
   char *filename = argv[1];
-  ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
   GtkApplication *app;
   int status;
-
-  fz_try(ctx) { fz_register_document_handlers(ctx); }
-  fz_catch(ctx) {
-    fprintf(stderr, "cannot register document handlers: %s\n",
-            fz_caught_message(ctx));
-    fz_drop_context(ctx);
-    return EXIT_FAILURE;
-  }
 
   // fool gtk so it doesn't complain that I didn't register myself as a file
   // opener
@@ -656,6 +686,5 @@ int main(int argc, char **argv) {
   g_signal_connect(app, "activate", G_CALLBACK(activate), filename);
   status = g_application_run(G_APPLICATION(app), argc, argv);
   g_object_unref(app);
-  fz_drop_context(ctx);
   return status;
 }

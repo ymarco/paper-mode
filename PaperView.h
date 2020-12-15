@@ -48,6 +48,7 @@ typedef struct DocInfo {
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   fz_colorspace *colorspace;
+  fz_context *ctx;
 } DocInfo;
 
 typedef struct _PaperViewPrivate {
