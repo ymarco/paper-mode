@@ -55,8 +55,8 @@ void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
     fz_catch(ctx) { fz_rethrow(ctx); }
   }
   fz_catch(ctx) {
-    drop_page(ctx, page);
-    fz_rethrow(ctx);
+    fprintf(stderr, "error loading page %d,%d: %s\n", location.chapter,
+            location.page, fz_caught_message(ctx));
   }
 }
 
@@ -190,8 +190,14 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
           fz_round_rect(fz_transform_rect(page->cache.highlighted_link->rect,
                                           draw_page_ctm)));
     }
-    fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
-                        transformed_bounds, NULL);
+    fz_try(ctx) {
+      fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
+                          transformed_bounds, NULL);
+    }
+    fz_catch(ctx) {
+      fprintf(stderr, "couldn't render page %d,%d: %s\n", loc.chapter, loc.page,
+              fz_caught_message(ctx));
+    }
     /* fprintf(stderr, "\rscroll: %3.0f %3.0f, stopped.y: %3.0f", */
     /*         c->doci.scroll.x, c->doci->scroll.y, stopped.y); */
     stopped.y += page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
