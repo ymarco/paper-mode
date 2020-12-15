@@ -22,7 +22,7 @@ typedef struct Page {
   PageRenderCache cache;
 } Page;
 
-const int PAGE_SEPARATOR_HEIGHT = 18;
+extern const int PAGE_SEPARATOR_HEIGHT;
 
 typedef struct DocInfo {
   fz_document *doc;

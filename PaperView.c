@@ -6,6 +6,8 @@
 #include "PaperView.h"
 #include <gtk/gtk.h>
 
+const int PAGE_SEPARATOR_HEIGHT = 18;
+
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
 void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
