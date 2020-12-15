@@ -174,9 +174,10 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     scale_ctm = get_scale_ctm(&c->doci, page);
     draw_page_ctm = fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
     // foreground around page boundry
-    fz_clear_pixmap_rect_with_value(
-        ctx, pixmap, 0xFF,
-        fz_round_rect(fz_transform_rect(page->page_bounds, draw_page_ctm)));
+    fz_rect transformed_bounds =
+        fz_transform_rect(page->page_bounds, draw_page_ctm);
+    fz_clear_pixmap_rect_with_value(ctx, pixmap, 0xFF,
+                                    fz_round_rect(transformed_bounds));
     // highlight text selection
     if ((c->doci.selection_active || c->doci.selecting) &&
         memcmp(&loc, &c->doci.selection_loc_end, sizeof(fz_location)) <= 0) {
@@ -189,9 +190,8 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
           fz_round_rect(fz_transform_rect(page->cache.highlighted_link->rect,
                                           draw_page_ctm)));
     }
-    /* fz_run_page(ctx, page->page, draw_device, draw_page_ctm, &cookie); */
     fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
-                        page->page_bounds, NULL);
+                        transformed_bounds, NULL);
     /* fprintf(stderr, "\rscroll: %3.0f %3.0f, stopped.y: %3.0f", */
     /*         c->doci.scroll.x, c->doci->scroll.y, stopped.y); */
     stopped.y += page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
