@@ -366,10 +366,27 @@ static gboolean query_tooltip(GtkWidget *widget, int x, int y,
   return TRUE;
 }
 
-static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
+static void follow_link(GtkWidget *widget, fz_link *link) {
+  // TODO follow non-internal links
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   DocInfo *doci = &c->doci;
   fz_context *ctx = doci->ctx;
+  doci->location = fz_resolve_link(ctx, doci->doc, link->uri, &doci->scroll.x,
+                                   &doci->scroll.y);
+  int width = gtk_widget_get_allocated_width(widget);
+  Page *page = get_page(doci, doci->location);
+  fz_matrix scale_ctm = get_scale_ctm(doci, page);
+  if (width > fz_transform_rect(page->page_bounds, scale_ctm).x1)
+    center_page(width, &c->doci);
+  // set back cursor. update_highlighted_link won't reset it since from
+  // its perspective the selected link did not change on the
+  // newly-followed page
+  gdk_window_set_cursor(gtk_widget_get_window(widget), c->default_cursor);
+}
+
+static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  DocInfo *doci = &c->doci;
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
     if (doci->selecting) {
@@ -392,13 +409,7 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
       Page *page = get_page(&c->doci, mouse_page_loc);
       fz_link *link = page->cache.highlighted_link;
       if (link != NULL) {
-        // TODO follow non-internal links
-        doci->location = fz_resolve_link(ctx, doci->doc, link->uri,
-                                         &doci->scroll.x, &doci->scroll.y);
-        // set back cursor. update_highlighted_link won't reset it since from
-        // its perspective the selected link did not change on the
-        // newly-followed page
-        gdk_window_set_cursor(gtk_widget_get_window(widget), c->default_cursor);
+        follow_link(widget, link);
       }
     }
     break;
