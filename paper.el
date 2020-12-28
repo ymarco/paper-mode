@@ -19,6 +19,7 @@
 ;;
 ;;; Code:
 
+(require 'cl-lib)
 
 (unless module-file-suffix
   (error "Paper needs module support.  Please compile Emacs with the --with-modules option!"))
@@ -42,9 +43,30 @@
                        (t (error err-msg ws)))))
     (paper--move-to-frame paper--id win-id)))
 
+(defun paper--adjust-size (frame)
+  (ignore frame)
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (when (and (eq major-mode 'paper-mode) (buffer-live-p buffer))
+        (let* ((windows (get-buffer-window-list buffer 'nomini t)))
+          (if (not windows)
+              (paper--hide paper--id)
+            (let* ((show-window (if (memq (selected-window) windows)
+                                    (selected-window)
+                                  (car windows)))
+                   (hide-windows (remq show-window windows))
+                   (show-frame (window-frame show-window)))
+              (paper--move-to-x-or-pgtk-frame show-frame)
+              (cl-destructuring-bind (left top right bottom)
+                  (window-inside-pixel-edges show-window)
+                (paper--show paper--id)
+                (paper--resize paper--id left top
+                               (- right left) (- bottom top)))
+              (dolist (window hide-windows)
+                (switch-to-prev-buffer window)))))))))
 
 ;;;###autoload
-(define-derived-mode paper-mode special-mode "Paper"
+(define-derived-mode paper-mode fundamental-mode "Paper"
   "Paper document viewing mode."
   (setq-local
    paper--process (make-pipe-process :name "paper"
@@ -54,7 +76,16 @@
                                      :filter 'webkit--filter
                                      :noquery t)
    paper--id (paper--new paper--process nil buffer-file-name nil))
-  (paper--move-to-x-or-pgtk-frame (selected-frame)))
+  (paper--move-to-x-or-pgtk-frame (selected-frame))
+  (cl-destructuring-bind (left top right bottom)
+      (window-inside-pixel-edges (selected-window))
+    ;; (paper--show paper--id)
+    (paper--resize paper--id left top
+                   (- right left) (- bottom top)))
+  (paper--resize))
+
+(add-hook 'window-size-change-functions #'paper--adjust-size)
+;; (add-hook 'delete-frame-functions #'webkit--delete-frame)
 
 (provide 'paper)
 ;;; paper.el ends here

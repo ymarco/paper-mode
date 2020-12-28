@@ -70,9 +70,9 @@ static emacs_value Fpaper_new(emacs_env *env, ptrdiff_t nargs,
 
   /* c->view = paper_view_new(filename_c, accel_filename_c); */
   /* c->view = gtk_drawing_area_new(); */
-  c->view = gtk_button_new_with_label ("Hello World");
-  /* c->view = GTK_WIDGET(paper_view_new( */
-  /*     "/home/ym/.config/doom/packages/paper-mode/amsmath.pdf", NULL)); */
+  /* c->view = gtk_button_new_with_label ("Hello World"); */
+  c->view = GTK_WIDGET(paper_view_new(
+      "/home/ym/.config/doom/packages/paper-mode/amsmath.pdf", NULL));
   if (!c->view) {
     signal_error(env, "paper-module-couldnt-create-widget");
     return Qnil;
@@ -108,7 +108,7 @@ static emacs_value Fpaper_new(emacs_env *env, ptrdiff_t nargs,
     }
     client_change_container(c, fixed);
     gtk_widget_show_all(GTK_WIDGET(c->view));
-    fprintf(stderr, "finished opening!");
+    fprintf(stderr, "finished opening!\n");
   }
 
   // g_signal_connect (G_OBJECT (c->view), "destroy",
@@ -147,6 +147,8 @@ int emacs_module_init(struct emacs_runtime *ert) {
        "\\fn(PIPE, IN-OWN-WINDOW, FILENAME, ACCEL_FILENAME)\n");
   mkfn(env, 2, 2, client_move_to_frame, "paper--move-to-frame", "");
   mkfn(env, 1, 1, client_show, "paper--show", "");
+  mkfn(env, 1, 1, client_hide, "paper--hide", "");
+  mkfn(env, 5, 5, client_resize, "paper--resize", "");
   provide(env, "paper-module");
   return 0;
 }
