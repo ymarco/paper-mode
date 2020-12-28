@@ -3,6 +3,7 @@ CFLAGS += -std=c99 -fpic
 CFLAGS += `pkg-config --cflags gtk+-3.0 --libs cairo`
 CFLAGS += -I/usr/local/include
 CFLAGS += -lm
+CFLAGS += -lmupdf -lmupdf-third
 
 O_DEBUG := 0  # debug binary
 O_RELEASE := 0  # debug binary
@@ -16,14 +17,15 @@ ifeq ($(O_RELEASE),1)
 endif
 
 
-# all : paper-module.so
-PaperView: PaperView.c
+paper-module.so: paper-module.o PaperView.o
+	$(CC) $(CFLAGS) -shared -o $@ $^ /usr/lib64/libmupdf.a /usr/lib64/libmupdf-third.a
+
+paper-module.o: PaperView.h from-webkit.h emacs-module.h
+
+PaperView: PaperView.c PaperView.h
 	$(CC) $(CFLAGS) -o $@ $^ /usr/local/lib/libmupdf.a /usr/local/lib/libmupdf-third.a
 
-paper-module.so : paper-module.c
-	$(CC) -shared $(CFLAGS) -o $@  $^
-
 clean :
-	$(RM) paper-module.soPaperView 
+	$(RM) paper-module.so PaperView *.o
 
 .PHONY : clean all
