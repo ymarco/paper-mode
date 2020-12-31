@@ -69,6 +69,8 @@
 (define-derived-mode paper-mode fundamental-mode "Paper"
   "Paper document viewing mode."
   (setq-local
+   buffer-read-only t
+   cursor-type nil
    paper--process (make-pipe-process :name "paper"
                                      :buffer (generate-new-buffer
                                               (format "* %s: pipe-process"
