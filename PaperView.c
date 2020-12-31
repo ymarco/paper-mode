@@ -40,7 +40,6 @@ void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
   fz_try(ctx) {
     page->page =
         fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
-    page->page_text = fz_new_stext_page_from_page(ctx, page->page, NULL);
     page->seps = NULL; // TODO seps
     page->links = fz_load_links(ctx, page->page);
     page->page_bounds = fz_bound_page(ctx, page->page);
@@ -53,6 +52,8 @@ void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
       fz_drop_device(ctx, device);
     }
     fz_catch(ctx) { fz_rethrow(ctx); }
+    page->page_text =
+        fz_new_stext_page_from_display_list(ctx, page->display_list, NULL);
   }
   fz_catch(ctx) {
     fprintf(stderr, "error loading page %d,%d: %s\n", location.chapter,
