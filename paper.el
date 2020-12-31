@@ -65,6 +65,27 @@
               (dolist (window hide-windows)
                 (switch-to-prev-buffer window)))))))))
 
+(defun paper-scroll-up ()
+  (interactive)
+  (paper--scroll paper--id 0.0 -0.1))
+(defun paper-scroll-down ()
+  (interactive)
+  (paper--scroll paper--id 0.0 0.1))
+(defun paper-scroll-left ()
+  (interactive)
+  (paper--scroll paper--id -0.1 0.0))
+(defun paper-scroll-right ()
+  (interactive)
+  (paper--scroll paper--id 0.1 0.0))
+
+(defvar paper-mode-map (let ((map (make-sparse-keymap)))
+                         (define-key map "k" #'paper-scroll-up)
+                         (define-key map "j" #'paper-scroll-down)
+                         (define-key map "h" #'paper-scroll-left)
+                         (define-key map "l" #'paper-scroll-right)
+                         map)
+  "Keymap for `paper-mode'.")
+
 ;;;###autoload
 (define-derived-mode paper-mode fundamental-mode "Paper"
   "Paper document viewing mode."

@@ -122,6 +122,15 @@ static emacs_value Fpaper_new(emacs_env *env, ptrdiff_t nargs,
   return env->make_user_ptr(env, client_free, (void *)c);
 }
 
+emacs_value Fpaper_scroll(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
+                          void *data) {
+  Client *c = env->get_user_ptr(env, args[0]);
+  double x = env->extract_float(env, args[1]);
+  double y = env->extract_float(env, args[2]);
+  scroll_relatively(c->view, fz_make_point(x, y));
+  return Qnil;
+}
+
 static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                  emacs_value (*func)(emacs_env *env, ptrdiff_t nargs,
                                      emacs_value *args, void *data),
@@ -132,7 +141,6 @@ static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
 
   env->funcall(env, Qfset, 2, (emacs_value[]){Qsym, Sfun});
 }
-
 
 int emacs_module_init(struct emacs_runtime *ert) {
   emacs_env *env = ert->get_environment(ert);
@@ -149,6 +157,7 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, client_show, "paper--show", "");
   mkfn(env, 1, 1, client_hide, "paper--hide", "");
   mkfn(env, 5, 5, client_resize, "paper--resize", "");
+  mkfn(env, 3, 3, Fpaper_scroll, "paper--scroll", "\\fn(ID, X, Y)");
   provide(env, "paper-module");
   return 0;
 }
