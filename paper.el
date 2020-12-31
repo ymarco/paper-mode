@@ -78,13 +78,9 @@
                                      :filter 'webkit--filter
                                      :noquery t)
    paper--id (paper--new paper--process nil buffer-file-name nil))
-  (paper--move-to-x-or-pgtk-frame (selected-frame))
-  (cl-destructuring-bind (left top right bottom)
-      (window-inside-pixel-edges (selected-window))
-    ;; (paper--show paper--id)
-    (paper--resize paper--id left top
-                   (- right left) (- bottom top)))
-  (paper--resize))
+  ;; don't waste rendering time below our frame with the raw PDF text
+  (narrow-to-region (point-min) (point-min))
+  (paper--adjust-size (selected-frame)))
 
 (add-hook 'window-size-change-functions #'paper--adjust-size)
 ;; (add-hook 'delete-frame-functions #'webkit--delete-frame)
