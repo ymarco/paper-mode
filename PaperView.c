@@ -497,6 +497,23 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   scroll_pages(doci);
 }
 
+/*
+ * Scroll relative to widget width/height.
+ * Having mult.y = 0.1 means scroll down 10% of the widget height.
+ */
+void scroll_relatively(GtkWidget *widget, fz_point mult) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  int w = gtk_widget_get_allocated_width(widget);
+  int h = gtk_widget_get_allocated_height(widget);
+  Page *page = get_page(&c->doci, c->doci.location);
+  // don't include rotation
+  fz_matrix scale_ctm = fz_transform_page(page->page_bounds, c->doci.zoom, 0);
+  fz_matrix scale_ctm_inv = fz_invert_matrix(scale_ctm);
+  fz_point scrolled =
+      fz_transform_point(fz_make_point(mult.x * w, mult.y * h), scale_ctm_inv);
+  scroll(&c->doci, scrolled);
+}
+
 static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   if (event->type != GDK_SCROLL) {
@@ -517,29 +534,21 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
     zoom_around_point(widget, &c->doci, c->doci.zoom * multiplier,
                       fz_make_point(event->x, event->y));
   } else { // scroll
-    int w = gtk_widget_get_allocated_width(widget);
-    int h = gtk_widget_get_allocated_height(widget);
-    // scroll 10% of window pixels
+    // scroll 10% of window dimentions
     float multiplier = 0.10;
-    Page *page = get_page(&c->doci, c->doci.location);
-    // don't include rotation
-    fz_matrix scale_ctm = fz_transform_page(page->page_bounds, c->doci.zoom, 0);
-    fz_matrix scale_ctm_inv = fz_invert_matrix(scale_ctm);
-    fz_point scrolled = fz_transform_point(
-        fz_make_point(multiplier * w, multiplier * h), scale_ctm_inv);
     fz_point d = {0, 0};
     switch (event->direction) {
     case GDK_SCROLL_UP:
-      d.y = -scrolled.y;
+      d.y = -multiplier;
       break;
     case GDK_SCROLL_DOWN:
-      d.y = scrolled.y;
+      d.y = multiplier;
       break;
     case GDK_SCROLL_LEFT:
-      d.x = -scrolled.x;
+      d.x = -multiplier;
       break;
     case GDK_SCROLL_RIGHT:
-      d.x = scrolled.x;
+      d.x = multiplier;
       break;
     case GDK_SCROLL_SMOOTH:
       d.x = event->delta_x;
@@ -547,7 +556,7 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
       fprintf(stderr, "Smooth scroll\n");
       break;
     }
-    scroll(&c->doci, d);
+    scroll_relatively(widget, d);
   }
   update_highlighted_link(widget, fz_make_point(event->x, event->y));
   gtk_widget_queue_draw(widget);
