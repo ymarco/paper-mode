@@ -10,22 +10,23 @@ window. Once I have mouse controls and things stabilize I'll embed it into Emacs
 - [-] Outside Emacs
   + [X] Ensure zoom & rotation work
   + [X] Scroll
-  + [ ] Sensible page dimensions by default:
-    Center with a fixed width if the window is too long, fit to width if
-    sensible, calculate minimum width with ~fz_new_bbox_device~ if too small.
   + [X] Show more than one page at a time
   + [-] Mouse:
     - [ ] Smooth scrolling like Evince has
     - [X] Select text over multiple pages
-    - [-] Links:
+    - [X] Links:
       + [X] Highlight on hover
       + [X] Show destination in a mousce hover popup kinda thing
-      + [-] Follow on click - works only on internal links
+      + [X] Follow internal links on click
   + [ ] Lazy load page text
   + [ ] Pre render next pages and free previous pages
   + [ ] Synctex
-- [ ] Inside Emacs
-  + [ ] Evil controls. I can't do Emacs-style keybinds myself.
+- [-] Inside Emacs
+  + [ ] Sensible page dimensions by default:
+    Center with a fixed width if the window is too long, fit to width if
+    sensible, calculate minimum width with ~fz_new_bbox_device~ if too small.
+  + [-] Evil controls. I can't do Emacs-style keybinds myself.
+  + [ ] Follow links external to the document
   + [ ] Search
     - [ ] Normal
     - [ ] With a swiper-like preview of the results
