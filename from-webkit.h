@@ -111,6 +111,19 @@ static void client_change_container(Client *c, GtkFixed *fixed) {
   }
 }
 
+static emacs_value client_destroy(emacs_env *env, ptrdiff_t n,
+                                  emacs_value *args, void *ptr) {
+  Client *c = (Client *)env->get_user_ptr(env, args[0]);
+  debug_print("c %p webkit_destroy\n", c);
+  if (c != NULL) {
+    if (GTK_IS_WINDOW(c->container))
+      gtk_widget_destroy(c->container);
+
+    c->container = NULL;
+  }
+  return Qnil;
+}
+
 static void client_free(void *ptr) {
   debug_print("c %p client_free\n", ptr);
   Client *c = (Client *)ptr;

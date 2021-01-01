@@ -65,6 +65,22 @@
               (dolist (window hide-windows)
                 (switch-to-prev-buffer window)))))))))
 
+(defun paper--kill-buffer ()
+  (paper--hide paper--id)
+  (paper--destroy paper--id))
+
+(defun paper--delete-frame (frame)
+  (let ((new-frame (cl-some
+                    (lambda (elt)
+                      (not (or (eq elt frame)
+                               (frame-parameter elt 'parent-frame)
+                               (not (display-graphic-p elt)))))
+                    (frame-list))))
+    (dolist (buffer (buffer-list))
+      (when (eq major-mode 'paper-mode)
+        (with-current-buffer buffer
+          (paper--move-to-x-or-pgtk-frame new-frame))))))
+
 (defmacro paper--bind-id (new-name mod-func-name &rest args)
   `(defun ,new-name ()
      (interactive)
@@ -118,11 +134,12 @@
                                      :noquery t)
    paper--id (paper--new paper--process nil buffer-file-name nil))
   ;; don't waste rendering time below our frame with the raw PDF text
+  (add-hook 'kill-buffer-hook #'paper--kill-buffer nil t)
   (narrow-to-region (point-min) (point-min))
   (paper--adjust-size (selected-frame)))
 
 (add-hook 'window-size-change-functions #'paper--adjust-size)
-;; (add-hook 'delete-frame-functions #'webkit--delete-frame)
+(add-hook 'delete-frame-functions #'paper--delete-frame)
 
 (provide 'paper)
 ;;; paper.el ends here

@@ -182,6 +182,7 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, client_show, "paper--show", "");
   mkfn(env, 1, 1, client_hide, "paper--hide", "");
   mkfn(env, 5, 5, client_resize, "paper--resize", "");
+  mkfn(env, 1, 1, client_destroy, "paper--destroy", "");
   mkfn(env, 3, 3, Fpaper_scroll, "paper--scroll", "\\fn(ID, X, Y)");
   mkfn(env, 2, 2, Fpaper_page_scroll, "paper--scroll-pagewise", "\\fn(ID, I)");
   mkfn(env, 2, 2, Fpaper_zoom, "paper--zoom", "\\fn(ID, MULTIPLIER)");
