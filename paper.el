@@ -36,10 +36,10 @@
 
 (defun paper--move-to-x-or-pgtk-frame (frame)
   (let* ((ws (window-system frame))
-         (err-msg "Cannot move webkit view to frame with window-system %S")
+         (err-msg "Cannot move paper view to frame with window-system %S")
          (win-id (string-to-number (frame-parameter frame 'window-id)))
          (win-id (cond ((eq ws 'pgtk) win-id)
-                       ((eq ws 'x) (webkit--xid-to-pointer win-id))
+                       ((eq ws 'x) (paper--xid-to-pointer win-id))
                        (t (error err-msg ws)))))
     (paper--move-to-frame paper--id win-id)))
 
