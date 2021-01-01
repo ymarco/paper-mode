@@ -84,6 +84,7 @@ GType paper_view_get_type(void) G_GNUC_CONST;
 void scroll_relatively(GtkWidget *widget, fz_point mult);
 void scroll_whole_pages(GtkWidget *widget, int i);
 void zoom_to_window_center(GtkWidget *widget, float multiplier);
+void center(GtkWidget *widget);
 
 PaperView *paper_view_new(char *filename, char *accel_filename);
 

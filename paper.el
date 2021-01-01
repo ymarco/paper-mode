@@ -95,6 +95,9 @@
 (defun paper-zoom-out ()
   (interactive)
   (paper--zoom paper--id (/ 1 1.1)))
+(defun paper-center ()
+  (interactive)
+  (paper--center paper--id))
 
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings

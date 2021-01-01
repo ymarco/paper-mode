@@ -144,6 +144,13 @@ emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs,
   return Qnil;
 }
 
+emacs_value Fpaper_center(emacs_env *env, ptrdiff_t nargs,
+                          emacs_value args[], void *data) {
+  Client *c = env->get_user_ptr(env, args[0]);
+  center(c->view);
+  return Qnil;
+}
+
 static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                  emacs_value (*func)(emacs_env *env, ptrdiff_t nargs,
                                      emacs_value *args, void *data),
@@ -173,6 +180,7 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 3, 3, Fpaper_scroll, "paper--scroll", "\\fn(ID, X, Y)");
   mkfn(env, 2, 2, Fpaper_page_scroll, "paper--scroll-pagewise", "\\fn(ID, I)");
   mkfn(env, 2, 2, Fpaper_zoom, "paper--zoom", "\\fn(ID, MULTIPLIER)");
+  mkfn(env, 1, 1, Fpaper_center, "paper--center", "");
   provide(env, "paper-module");
   return 0;
 }

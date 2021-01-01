@@ -51,6 +51,8 @@
     "-" #'paper-zoom-out
     "=" #'paper-zoom-in
 
+    "c" #'paper-center
+
     "i" #'ignore
     "I" #'ignore
     "a" #'ignore

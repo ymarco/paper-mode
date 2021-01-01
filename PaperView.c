@@ -603,6 +603,12 @@ void zoom_to_window_center(GtkWidget *widget, float multiplier) {
                     fz_make_point(w / 2.0f, h / 2.0f));
 }
 
+void center(GtkWidget *widget) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  int w = gtk_widget_get_allocated_width(widget);
+  center_page(w, &c->doci);
+}
+
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // zero it all out - the short way of setting everything to NULL.
   memset(doci, 0, sizeof(*doci));
