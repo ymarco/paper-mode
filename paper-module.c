@@ -136,8 +136,8 @@ emacs_value Fpaper_page_scroll(emacs_env *env, ptrdiff_t nargs,
   return Qnil;
 }
 
-emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs,
-                        emacs_value args[], void *data) {
+emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
+                        void *data) {
   Client *c = env->get_user_ptr(env, args[0]);
   double m = env->extract_float(env, args[1]);
   zoom_to_window_center(c->view, m);

@@ -170,39 +170,34 @@ static emacs_value client_show(emacs_env *env, ptrdiff_t n, emacs_value *args,
   return Qnil;
 }
 
-static emacs_value
-client_hide (emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
-{
+static emacs_value client_hide(emacs_env *env, ptrdiff_t n, emacs_value *args,
+                               void *ptr) {
   Client *c = (Client *)env->get_user_ptr(env, args[0]);
   if (c != NULL)
-    gtk_widget_hide (GTK_WIDGET (c->view));
+    gtk_widget_hide(GTK_WIDGET(c->view));
   return Qnil;
 }
 
-static emacs_value
-client_resize (emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
-{
+static emacs_value client_resize(emacs_env *env, ptrdiff_t n, emacs_value *args,
+                                 void *ptr) {
   Client *c = (Client *)env->get_user_ptr(env, args[0]);
   int x = env->extract_integer(env, args[1]);
   int y = env->extract_integer(env, args[2]);
   int w = env->extract_integer(env, args[3]);
   int h = env->extract_integer(env, args[4]);
 
-  debug_print ("c %p resize (x:%d y:%d w:%d h:%d)\n", c, x, y, w, h);
-  if ((env->non_local_exit_check(env) == emacs_funcall_exit_return)
-      && (c != NULL))
-    {
-      if (GTK_IS_FIXED(c->container))
-        gtk_fixed_move (GTK_FIXED (c->container), GTK_WIDGET(c->view), x, y);
-      else if (GTK_IS_WINDOW(c->container))
-        gtk_window_move (GTK_WINDOW (c->container), x, y);
-      else
-        assert (0);
-      gtk_widget_set_size_request(GTK_WIDGET(c->view), w, h);
-    }
+  debug_print("c %p resize (x:%d y:%d w:%d h:%d)\n", c, x, y, w, h);
+  if ((env->non_local_exit_check(env) == emacs_funcall_exit_return) &&
+      (c != NULL)) {
+    if (GTK_IS_FIXED(c->container))
+      gtk_fixed_move(GTK_FIXED(c->container), GTK_WIDGET(c->view), x, y);
+    else if (GTK_IS_WINDOW(c->container))
+      gtk_window_move(GTK_WINDOW(c->container), x, y);
+    else
+      assert(0);
+    gtk_widget_set_size_request(GTK_WIDGET(c->view), w, h);
+  }
   return Qnil;
 }
-
-
 
 #endif // __FROM_WEBKIT_H_

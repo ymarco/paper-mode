@@ -153,6 +153,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   unsigned char *image = cairo_image_surface_get_data(surface);
 
   fz_irect whole_rect = {.x1 = width, .y1 = height};
+  fz_rect float_rect = {.x1 = width, .y1 = height};
 
   fz_pixmap *pixmap = NULL;
   fz_device *draw_device = NULL;
@@ -197,7 +198,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     }
     fz_try(ctx) {
       fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
-                          transformed_bounds, NULL);
+                          float_rect, NULL);
     }
     fz_catch(ctx) {
       fprintf(stderr, "couldn't render page %d,%d: %s\n", loc.chapter, loc.page,
@@ -611,7 +612,8 @@ void zoom_to_window_center(GtkWidget *widget, float multiplier) {
   int w = gtk_widget_get_allocated_width(widget);
   int h = gtk_widget_get_allocated_height(widget);
   float old = c->doci.zoom;
-  /* zoom_around_point(widget, &c->doci, old * multiplier, fz_make_point(20, 20)); */
+  /* zoom_around_point(widget, &c->doci, old * multiplier, fz_make_point(20,
+   * 20)); */
   zoom_around_point(widget, &c->doci, old * multiplier,
                     fz_make_point(w / 2.0f, h / 2.0f));
 }

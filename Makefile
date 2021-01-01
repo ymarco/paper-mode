@@ -22,6 +22,8 @@ paper-module.so: paper-module.o PaperView.o
 
 paper-module.o: PaperView.h from-webkit.h emacs-module.h
 
+PaperView.o: PaperView.h PaperView.c
+
 PaperView: PaperView.c PaperView.h
 	$(CC) $(CFLAGS) -o $@ $^ /usr/local/lib/libmupdf.a /usr/local/lib/libmupdf-third.a
 
