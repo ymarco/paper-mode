@@ -65,39 +65,33 @@
               (dolist (window hide-windows)
                 (switch-to-prev-buffer window)))))))))
 
-(defun paper-scroll-up ()
-  (interactive)
-  (paper--scroll paper--id 0.0 -0.1))
-(defun paper-scroll-down ()
-  (interactive)
-  (paper--scroll paper--id 0.0 0.1))
-(defun paper-scroll-left ()
-  (interactive)
-  (paper--scroll paper--id -0.1 0.0))
-(defun paper-scroll-right ()
-  (interactive)
-  (paper--scroll paper--id 0.1 0.0))
-(defun paper-scroll-window-up ()
-  (interactive)
-  (paper--scroll paper--id 0.0 -0.5))
-(defun paper-scroll-window-down ()
-  (interactive)
-  (paper--scroll paper--id 0.0 0.5))
-(defun paper-scroll-prev-page ()
-  (interactive)
-  (paper--scroll-pagewise paper--id -1))
-(defun paper-scroll-next-page ()
-  (interactive)
-  (paper--scroll-pagewise paper--id 1))
-(defun paper-zoom-in ()
-  (interactive)
-  (paper--zoom paper--id 1.1))
-(defun paper-zoom-out ()
-  (interactive)
-  (paper--zoom paper--id (/ 1 1.1)))
-(defun paper-center ()
-  (interactive)
-  (paper--center paper--id))
+(defmacro paper--bind-id (new-name mod-func-name &rest args)
+  `(defun ,new-name ()
+     (interactive)
+     (,mod-func-name paper--id ,@args)))
+
+(paper--bind-id paper-scroll-up
+                paper--scroll 0.0 -0.1)
+(paper--bind-id paper-scroll-down
+                paper--scroll 0.0 0.1)
+(paper--bind-id paper-scroll-left
+                paper--scroll -0.1 0.0)
+(paper--bind-id paper-scroll-right
+                paper--scroll 0.1 0.0)
+(paper--bind-id paper-scroll-window-up
+                paper--scroll 0.0 -0.5)
+(paper--bind-id paper-scroll-window-down
+                paper--scroll 0.0 0.5)
+(paper--bind-id paper-scroll-prev-page
+                paper--scroll-pagewise -1)
+(paper--bind-id paper-scroll-next-page
+                paper--scroll-pagewise 1)
+(paper--bind-id paper-zoom-in
+                paper--zoom 1.1)
+(paper--bind-id paper-zoom-out
+                paper--zoom (/ 1 1.1))
+(paper--bind-id paper-center
+                paper--center)
 
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings
