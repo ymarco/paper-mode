@@ -77,6 +77,12 @@
 (defun paper-scroll-right ()
   (interactive)
   (paper--scroll paper--id 0.1 0.0))
+(defun paper-scroll-window-up ()
+  (interactive)
+  (paper--scroll paper--id 0.0 -0.5))
+(defun paper-scroll-window-down ()
+  (interactive)
+  (paper--scroll paper--id 0.0 0.5))
 (defun paper-scroll-prev-page ()
   (interactive)
   (paper--scroll-pagewise paper--id -1))
@@ -91,13 +97,7 @@
   (paper--zoom paper--id (/ 1 1.1)))
 
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
-                         (define-key map "k" #'paper-scroll-up)
-                         (define-key map "j" #'paper-scroll-down)
-                         (define-key map "h" #'paper-scroll-left)
-                         (define-key map "l" #'paper-scroll-right)
-                         (define-key map "K" #'paper-scroll-prev-page)
-                         (define-key map "J" #'paper-scroll-next-page)
-
+                         ;; TODO vanilla style bindings
                          (define-key map "-" #'paper-zoom-out)
                          (define-key map "=" #'paper-zoom-in)
                          map)
