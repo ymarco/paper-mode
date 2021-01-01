@@ -567,6 +567,32 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
   return FALSE;
 }
 
+void scroll_whole_pages(GtkWidget *widget, int i) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  fz_location future;
+  if (i > 0) {
+    for (; i > 0; i--) {
+      future = fz_next_page(c->doci.ctx, c->doci.doc, c->doci.location);
+      if (locationcmp(future, c->doci.location) == 0) {
+        // end of document, TODO scroll to page end
+        /* c->doci.scroll.y = get_page(&c->doci, future)->page_bounds.y1; */
+        return;
+      }
+      c->doci.location = future;
+    }
+  } else {
+    for (; i < 0; i++) {
+      future = fz_previous_page(c->doci.ctx, c->doci.doc, c->doci.location);
+      if (locationcmp(future, c->doci.location) == 0) {
+        // beginning of document, scroll to page start
+        c->doci.scroll.y = 0;
+        return;
+      }
+      c->doci.location = future;
+    }
+  }
+}
+
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // zero it all out - the short way of setting everything to NULL.
   memset(doci, 0, sizeof(*doci));

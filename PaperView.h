@@ -82,6 +82,7 @@ GType paper_view_get_type(void) G_GNUC_CONST;
   (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_PAPER_VIEW, PaperViewClass))
 
 void scroll_relatively(GtkWidget *widget, fz_point mult);
+void scroll_whole_pages(GtkWidget *widget, int i);
 
 PaperView *paper_view_new(char *filename, char *accel_filename);
 
