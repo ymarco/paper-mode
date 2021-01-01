@@ -68,11 +68,8 @@ static emacs_value Fpaper_new(emacs_env *env, ptrdiff_t nargs,
     accel_filename_c = NULL;
   }
 
-  /* c->view = paper_view_new(filename_c, accel_filename_c); */
-  /* c->view = gtk_drawing_area_new(); */
-  /* c->view = gtk_button_new_with_label ("Hello World"); */
-  c->view = GTK_WIDGET(paper_view_new(
-      "/home/ym/.config/doom/packages/paper-mode/amsmath.pdf", NULL));
+  c->view = GTK_WIDGET(paper_view_new(filename_c, accel_filename_c));
+
   if (!c->view) {
     signal_error(env, "paper-module-couldnt-create-widget");
     return Qnil;
