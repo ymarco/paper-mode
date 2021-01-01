@@ -144,12 +144,15 @@ emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs,
   return Qnil;
 }
 
-emacs_value Fpaper_center(emacs_env *env, ptrdiff_t nargs,
-                          emacs_value args[], void *data) {
-  Client *c = env->get_user_ptr(env, args[0]);
-  center(c->view);
-  return Qnil;
-}
+#define BIND_WIDGET(new_name, Fname)                                           \
+  emacs_value new_name(emacs_env *env, ptrdiff_t nargs, emacs_value args[],    \
+                       void *data) {                                           \
+    Client *c = env->get_user_ptr(env, args[0]);                               \
+    Fname(c->view);                                                            \
+    return Qnil;                                                               \
+  }
+
+BIND_WIDGET(Fpaper_center, center);
 
 static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                  emacs_value (*func)(emacs_env *env, ptrdiff_t nargs,
