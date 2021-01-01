@@ -593,6 +593,19 @@ void scroll_whole_pages(GtkWidget *widget, int i) {
   }
 }
 
+void goto_first_page(GtkWidget *widget) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  c->doci.location = fz_make_location(0, 0);
+  c->doci.scroll.y = 0;
+}
+
+void goto_last_page(GtkWidget *widget) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  c->doci.location = fz_last_page(c->doci.ctx, c->doci.doc);
+  // TODO scroll
+  /* c->doci.scroll.y = 0; */
+}
+
 void zoom_to_window_center(GtkWidget *widget, float multiplier) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   int w = gtk_widget_get_allocated_width(widget);

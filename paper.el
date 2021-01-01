@@ -92,6 +92,10 @@
                 paper--zoom (/ 1 1.1))
 (paper--bind-id paper-center
                 paper--center)
+(paper--bind-id paper-goto-first-page
+                paper--goto-first-page)
+(paper--bind-id paper-goto-last-page
+                paper--goto-last-page)
 
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings

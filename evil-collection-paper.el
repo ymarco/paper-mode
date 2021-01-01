@@ -53,6 +53,9 @@
 
     "c" #'paper-center
 
+    "gg" #'paper-goto-first-page
+    "G" #'paper-goto-last-page
+
     "i" #'ignore
     "I" #'ignore
     "a" #'ignore
