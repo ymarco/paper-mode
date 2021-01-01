@@ -10,6 +10,10 @@ const int PAGE_SEPARATOR_HEIGHT = 18;
 
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
+int locationcmp(fz_location a, fz_location b) {
+  return a.chapter - b.chapter || a.page - b.page;
+}
+
 void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
   fz_context *ctx = doci->ctx;
   if (doci->pages[chapter])
@@ -181,7 +185,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
                                     fz_round_rect(transformed_bounds));
     // highlight text selection
     if ((c->doci.selection_active || c->doci.selecting) &&
-        memcmp(&loc, &c->doci.selection_loc_end, sizeof(fz_location)) <= 0) {
+        locationcmp(loc, c->doci.selection_loc_end) <= 0) {
       highlight_selection(ctx, page, pixmap, draw_page_ctm);
     }
     // highlight selected link
@@ -265,7 +269,7 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
   Page *sel_start_page = get_page(&c->doci, c->doci.selection_loc_start);
   // set all pages between loc_start and loc_and to full selection
   for (fz_location loc = c->doci.selection_loc_start;
-       memcmp(&loc, &c->doci.selection_loc_end, sizeof(fz_location)) <= 0;
+       locationcmp(loc, c->doci.selection_loc_end) <= 0;
        loc = fz_next_page(ctx, c->doci.doc, loc)) {
     Page *page = get_page(&c->doci, loc);
     if (page != sel_start_page) {
@@ -440,7 +444,7 @@ static void scroll_pages(DocInfo *doci) {
                                PAGE_SEPARATOR_HEIGHT) {
     fz_location next = fz_next_page(ctx, doci->doc, doci->location);
     Page *page = get_page(doci, doci->location);
-    if (memcmp(&next, &doci->location, sizeof(next)) == 0) {
+    if (locationcmp(next, doci->location) == 0) {
       // end of document
       doci->scroll.y = page->page_bounds.y1;
       break;
@@ -451,7 +455,7 @@ static void scroll_pages(DocInfo *doci) {
   // move to previous pages if scroll.y is negative
   while (doci->scroll.y < 0) {
     fz_location next = fz_previous_page(ctx, doci->doc, doci->location);
-    if (memcmp(&next, &doci->location, sizeof(next)) == 0) {
+    if (locationcmp(next, doci->location) == 0) {
       // Beginning of document
       doci->scroll.y = 0;
       break;
@@ -480,8 +484,7 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   fz_location original_loc;
   trace_point_to_page(widget, doci, point, &original_point_in_page,
                       &original_loc);
-  for (fz_location loc = original_loc;
-       memcmp(&doci->location, &loc, sizeof(loc)) < 0;
+  for (fz_location loc = original_loc; locationcmp(doci->location, loc) < 0;
        loc = fz_previous_page(ctx, doci->doc, loc)) {
     original_point_in_page.y +=
         get_page(doci, loc)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
