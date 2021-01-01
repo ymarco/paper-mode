@@ -593,6 +593,16 @@ void scroll_whole_pages(GtkWidget *widget, int i) {
   }
 }
 
+void zoom_to_window_center(GtkWidget *widget, float multiplier) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  int w = gtk_widget_get_allocated_width(widget);
+  int h = gtk_widget_get_allocated_height(widget);
+  float old = c->doci.zoom;
+  /* zoom_around_point(widget, &c->doci, old * multiplier, fz_make_point(20, 20)); */
+  zoom_around_point(widget, &c->doci, old * multiplier,
+                    fz_make_point(w / 2.0f, h / 2.0f));
+}
+
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // zero it all out - the short way of setting everything to NULL.
   memset(doci, 0, sizeof(*doci));
