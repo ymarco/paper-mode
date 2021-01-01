@@ -112,6 +112,10 @@
                 paper--goto-first-page)
 (paper--bind-id paper-goto-last-page
                 paper--goto-last-page)
+(paper--bind-id paper-scroll-to-page-start
+                paper--scroll-to-page-start)
+(paper--bind-id paper-scroll-to-page-end
+                paper--scroll-to-page-end)
 
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings

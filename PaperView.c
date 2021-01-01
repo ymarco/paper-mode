@@ -568,6 +568,23 @@ static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
   return FALSE;
 }
 
+void scroll_to_page_start(GtkWidget *widget) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  c->doci.scroll.y = 0;
+}
+
+void scroll_to_page_end(GtkWidget *widget) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  int h = gtk_widget_get_allocated_height(widget);
+  Page *page = get_page(&c->doci, c->doci.location);
+  fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
+  fz_rect scaled_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
+  float scroll_scaled = scaled_bounds.y1 - h;
+  c->doci.scroll.y = fz_transform_point(fz_make_point(0, scroll_scaled),
+                                        fz_invert_matrix(scale_ctm))
+                         .y;
+}
+
 void scroll_whole_pages(GtkWidget *widget, int i) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   fz_location future;
@@ -575,8 +592,7 @@ void scroll_whole_pages(GtkWidget *widget, int i) {
     for (; i > 0; i--) {
       future = fz_next_page(c->doci.ctx, c->doci.doc, c->doci.location);
       if (locationcmp(future, c->doci.location) == 0) {
-        // end of document, TODO scroll to page end
-        /* c->doci.scroll.y = get_page(&c->doci, future)->page_bounds.y1; */
+        scroll_to_page_end(widget);
         return;
       }
       c->doci.location = future;
@@ -603,8 +619,7 @@ void goto_first_page(GtkWidget *widget) {
 void goto_last_page(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.location = fz_last_page(c->doci.ctx, c->doci.doc);
-  // TODO scroll
-  /* c->doci.scroll.y = 0; */
+  scroll_to_page_end(widget);
 }
 
 void zoom_to_window_center(GtkWidget *widget, float multiplier) {

@@ -155,6 +155,8 @@ emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
 BIND_WIDGET(Fpaper_center, center);
 BIND_WIDGET(Fpaper_goto_first_page, goto_first_page);
 BIND_WIDGET(Fpaper_goto_last_page, goto_last_page);
+BIND_WIDGET(Fpaper_scroll_to_page_start, scroll_to_page_start);
+BIND_WIDGET(Fpaper_scroll_to_page_end, scroll_to_page_end);
 
 static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                  emacs_value (*func)(emacs_env *env, ptrdiff_t nargs,
@@ -189,6 +191,8 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, Fpaper_center, "paper--center", "");
   mkfn(env, 1, 1, Fpaper_goto_first_page, "paper--goto-first-page", "");
   mkfn(env, 1, 1, Fpaper_goto_last_page, "paper--goto-last-page", "");
+  mkfn(env, 1, 1, Fpaper_scroll_to_page_start, "paper--scroll-to-page-start", "");
+  mkfn(env, 1, 1, Fpaper_scroll_to_page_end, "paper--scroll-to-page-end", "");
   provide(env, "paper-module");
   return 0;
 }

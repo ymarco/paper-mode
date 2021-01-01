@@ -56,6 +56,9 @@
     "gg" #'paper-goto-first-page
     "G" #'paper-goto-last-page
 
+    "zt" #'paper-scroll-to-page-start
+    "zb" #'paper-scroll-to-page-end
+
     "i" #'ignore
     "I" #'ignore
     "a" #'ignore
