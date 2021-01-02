@@ -71,6 +71,8 @@ Page *get_page(DocInfo *doci, fz_location loc) {
   return &doci->pages[loc.chapter][loc.page];
 }
 
+Page *get_cur_page(DocInfo *doci) { return get_page(doci, doci->location); }
+
 fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
   return fz_transform_page(page->page_bounds, doci->zoom, doci->rotate);
 }
@@ -104,7 +106,7 @@ static void trace_point_to_page(GtkWidget *widget, DocInfo *doci,
  * Set scroll.x so the current page is centered.
  */
 static void center_page(int surface_width, DocInfo *doci) {
-  Page *page = get_page(doci, doci->location);
+  Page *page = get_cur_page(doci);
   fz_matrix scale_ctm = get_scale_ctm(doci, page);
   fz_rect scaled_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
   fz_matrix scale_ctm_inv = fz_invert_matrix(scale_ctm);
@@ -158,7 +160,6 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   fz_pixmap *pixmap = NULL;
   fz_device *draw_device = NULL;
   fz_try(ctx) {
-
     pixmap = fz_new_pixmap_with_bbox_and_data(ctx, c->doci.colorspace,
                                               whole_rect, NULL, 1, image);
     fz_clear_pixmap_with_value(ctx, pixmap, 0xF0);
@@ -386,7 +387,7 @@ static void follow_link(GtkWidget *widget, fz_link *link) {
   doci->location = dst;
   doci->scroll = dst_scroll;
   int width = gtk_widget_get_allocated_width(widget);
-  Page *page = get_page(doci, doci->location);
+  Page *page = get_cur_page(doci);
   fz_matrix scale_ctm = get_scale_ctm(doci, page);
   if (width > fz_transform_rect(page->page_bounds, scale_ctm).x1)
     center_page(width, &c->doci);
@@ -447,10 +448,10 @@ static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
 static void scroll_pages(DocInfo *doci) {
   // move to next pages if scroll.y is past page border
   fz_context *ctx = doci->ctx;
-  while (doci->scroll.y >= get_page(doci, doci->location)->page_bounds.y1 +
-                               PAGE_SEPARATOR_HEIGHT) {
+  while (doci->scroll.y >=
+         get_cur_page(doci)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT) {
     fz_location next = fz_next_page(ctx, doci->doc, doci->location);
-    Page *page = get_page(doci, doci->location);
+    Page *page = get_cur_page(doci);
     if (locationcmp(next, doci->location) == 0) {
       // end of document
       doci->scroll.y = page->page_bounds.y1;
@@ -469,7 +470,7 @@ static void scroll_pages(DocInfo *doci) {
     }
     doci->location = next;
     doci->scroll.y +=
-        get_page(doci, doci->location)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
+        get_cur_page(doci)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
   }
 }
 
@@ -516,7 +517,7 @@ void scroll_relatively(GtkWidget *widget, fz_point mult) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   int w = gtk_widget_get_allocated_width(widget);
   int h = gtk_widget_get_allocated_height(widget);
-  Page *page = get_page(&c->doci, c->doci.location);
+  Page *page = get_cur_page(&c->doci);
   // don't include rotation
   fz_matrix scale_ctm = fz_transform_page(page->page_bounds, c->doci.zoom, 0);
   fz_matrix scale_ctm_inv = fz_invert_matrix(scale_ctm);
@@ -582,7 +583,7 @@ void scroll_to_page_start(GtkWidget *widget) {
 void scroll_to_page_end(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   int h = gtk_widget_get_allocated_height(widget);
-  Page *page = get_page(&c->doci, c->doci.location);
+  Page *page = get_cur_page(&c->doci);
   fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
   fz_rect scaled_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
   float scroll_scaled = scaled_bounds.y1 - h;
