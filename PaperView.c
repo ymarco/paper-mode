@@ -377,8 +377,14 @@ static void follow_link(GtkWidget *widget, fz_link *link) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   DocInfo *doci = &c->doci;
   fz_context *ctx = doci->ctx;
-  doci->location = fz_resolve_link(ctx, doci->doc, link->uri, &doci->scroll.x,
-                                   &doci->scroll.y);
+  fz_point dst_scroll;
+  fz_location dst =
+      fz_resolve_link(ctx, doci->doc, link->uri, &dst_scroll.x, &dst_scroll.y);
+  if (dst.chapter == -1 || dst.page == -1) // invalid link
+    // TODO emit some signal
+    return;
+  doci->location = dst;
+  doci->scroll = dst_scroll;
   int width = gtk_widget_get_allocated_width(widget);
   Page *page = get_page(doci, doci->location);
   fz_matrix scale_ctm = get_scale_ctm(doci, page);
