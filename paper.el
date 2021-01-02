@@ -130,6 +130,11 @@
   (setq-local
    buffer-read-only t
    cursor-type nil
+   left-margin-width nil
+   right-margin-width nil
+   left-fringe-width 0
+   right-fringe-width 0
+   vertical-scroll-bar nil
    paper--process (make-pipe-process :name "paper"
                                      :buffer (generate-new-buffer
                                               (format "* %s: pipe-process"
