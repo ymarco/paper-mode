@@ -5,6 +5,8 @@
 #include "emacs-module.h"
 #include <gtk/gtk.h>
 
+#define UNUSED(x) (void)(x)
+
 
 emacs_value Qnil;
 emacs_value Qargs_out_of_range;

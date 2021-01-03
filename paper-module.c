@@ -30,6 +30,8 @@ static gboolean paper_view_close(Client *c) {
 
 static emacs_value Fpaper_new(emacs_env *env, ptrdiff_t nargs,
                               emacs_value args[], void *data) {
+  UNUSED(nargs);
+  UNUSED(data);
   emacs_value channel = args[0];
   emacs_value open_new_window = args[1];
   emacs_value filename = args[2];
@@ -121,6 +123,8 @@ static emacs_value Fpaper_new(emacs_env *env, ptrdiff_t nargs,
 
 emacs_value Fpaper_scroll(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
                           void *data) {
+  UNUSED(nargs);
+  UNUSED(data);
   Client *c = env->get_user_ptr(env, args[0]);
   double x = env->extract_float(env, args[1]);
   double y = env->extract_float(env, args[2]);
@@ -130,6 +134,8 @@ emacs_value Fpaper_scroll(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
 
 emacs_value Fpaper_page_scroll(emacs_env *env, ptrdiff_t nargs,
                                emacs_value args[], void *data) {
+  UNUSED(nargs);
+  UNUSED(data);
   Client *c = env->get_user_ptr(env, args[0]);
   int x = env->extract_integer(env, args[1]);
   scroll_whole_pages(c->view, x);
@@ -138,6 +144,8 @@ emacs_value Fpaper_page_scroll(emacs_env *env, ptrdiff_t nargs,
 
 emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
                         void *data) {
+  UNUSED(nargs);
+  UNUSED(data);
   Client *c = env->get_user_ptr(env, args[0]);
   double m = env->extract_float(env, args[1]);
   zoom_to_window_center(c->view, m);
@@ -147,6 +155,8 @@ emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
 #define BIND_WIDGET(new_name, Fname)                                           \
   emacs_value new_name(emacs_env *env, ptrdiff_t nargs, emacs_value args[],    \
                        void *data) {                                           \
+    UNUSED(nargs);                                                             \
+    UNUSED(data);                                                              \
     Client *c = env->get_user_ptr(env, args[0]);                               \
     Fname(c->view);                                                            \
     return Qnil;                                                               \
@@ -174,12 +184,13 @@ static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
 int emacs_module_init(struct emacs_runtime *ert) {
   emacs_env *env = ert->get_environment(ert);
 
-  // Symbols;
+  // Symbols
   Qnil = env->make_global_ref(env, env->intern(env, "nil"));
   Qfset = env->make_global_ref(env, env->intern(env, "fset"));
   Qprovide = env->make_global_ref(env, env->intern(env, "provide"));
   Qargs_out_of_range =
       env->make_global_ref(env, env->intern(env, "args-out-of-range"));
+  // Functions
   mkfn(env, 4, 4, Fpaper_new, "paper--new",
        "\\fn(PIPE, IN-OWN-WINDOW, FILENAME, ACCEL_FILENAME)\n");
   mkfn(env, 2, 2, client_move_to_frame, "paper--move-to-frame", "");
@@ -193,10 +204,12 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, Fpaper_center, "paper--center", "");
   mkfn(env, 1, 1, Fpaper_goto_first_page, "paper--goto-first-page", "");
   mkfn(env, 1, 1, Fpaper_goto_last_page, "paper--goto-last-page", "");
-  mkfn(env, 1, 1, Fpaper_scroll_to_page_start, "paper--scroll-to-page-start", "");
+  mkfn(env, 1, 1, Fpaper_scroll_to_page_start, "paper--scroll-to-page-start",
+       "");
   mkfn(env, 1, 1, Fpaper_scroll_to_page_end, "paper--scroll-to-page-end", "");
   mkfn(env, 1, 1, Fpaper_fit_width, "paper--fit-width", "");
   mkfn(env, 1, 1, Fpaper_fit_height, "paper--fit-height", "");
+  // done
   provide(env, "paper-module");
   return 0;
 }

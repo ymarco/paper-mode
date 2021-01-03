@@ -43,6 +43,7 @@ static void send_to_lisp(Client *c, const char *id, const char *message) {
 }
 
 void window_destroy(GtkWidget *window, Client *c) {
+  UNUSED(window);
   debug_print("window destroying %p\n", c);
   if (c->container != NULL)
     gtk_widget_destroy(c->container);
@@ -111,8 +112,10 @@ static void client_change_container(Client *c, GtkFixed *fixed) {
   }
 }
 
-static emacs_value client_destroy(emacs_env *env, ptrdiff_t n,
+static emacs_value client_destroy(emacs_env *env, ptrdiff_t nargs,
                                   emacs_value *args, void *ptr) {
+  UNUSED(nargs);
+  UNUSED(ptr);
   Client *c = (Client *)env->get_user_ptr(env, args[0]);
   debug_print("c %p webkit_destroy\n", c);
   if (c != NULL) {
@@ -136,8 +139,10 @@ static void client_free(void *ptr) {
   free(c);
 }
 
-static emacs_value client_move_to_frame(emacs_env *env, ptrdiff_t n,
+static emacs_value client_move_to_frame(emacs_env *env, ptrdiff_t nargs,
                                         emacs_value *args, void *ptr) {
+  UNUSED(nargs);
+  UNUSED(ptr);
   Client *c = (Client *)env->get_user_ptr(env, args[0]);
   intmax_t window_id = env->extract_integer(env, args[1]);
 #ifdef DEBUG
@@ -165,24 +170,30 @@ static emacs_value client_move_to_frame(emacs_env *env, ptrdiff_t n,
                              env->intern(env, "nil"));
   return Qnil;
 }
-static emacs_value client_show(emacs_env *env, ptrdiff_t n, emacs_value *args,
-                               void *ptr) {
+static emacs_value client_show(emacs_env *env, ptrdiff_t nargs,
+                               emacs_value *args, void *ptr) {
+  UNUSED(nargs);
+  UNUSED(ptr);
   Client *c = (Client *)env->get_user_ptr(env, args[0]);
   if (c != NULL)
     gtk_widget_show(GTK_WIDGET(c->view));
   return Qnil;
 }
 
-static emacs_value client_hide(emacs_env *env, ptrdiff_t n, emacs_value *args,
-                               void *ptr) {
+static emacs_value client_hide(emacs_env *env, ptrdiff_t nargs,
+                               emacs_value *args, void *ptr) {
+  UNUSED(nargs);
+  UNUSED(ptr);
   Client *c = (Client *)env->get_user_ptr(env, args[0]);
   if (c != NULL)
     gtk_widget_hide(GTK_WIDGET(c->view));
   return Qnil;
 }
 
-static emacs_value client_resize(emacs_env *env, ptrdiff_t n, emacs_value *args,
-                                 void *ptr) {
+static emacs_value client_resize(emacs_env *env, ptrdiff_t nargs,
+                                 emacs_value *args, void *ptr) {
+  UNUSED(nargs);
+  UNUSED(ptr);
   Client *c = (Client *)env->get_user_ptr(env, args[0]);
   int x = env->extract_integer(env, args[1]);
   int y = env->extract_integer(env, args[2]);
