@@ -646,6 +646,20 @@ void center(GtkWidget *widget) {
   center_page(w, &c->doci);
 }
 
+void fit_width(GtkWidget *widget) {
+  int w = gtk_widget_get_allocated_width(widget);
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  c->doci.scroll.x = 0;
+  c->doci.zoom = ((float)w / get_cur_page(&c->doci)->page_bounds.x1) * 100.0f;
+}
+
+void fit_height(GtkWidget *widget) {
+  int h = gtk_widget_get_allocated_height(widget);
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  c->doci.scroll.y = 0;
+  c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1) * 100.0f;
+}
+
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // zero it all out - the short way of setting everything to NULL.
   memset(doci, 0, sizeof(*doci));

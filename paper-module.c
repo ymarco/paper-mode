@@ -157,6 +157,8 @@ BIND_WIDGET(Fpaper_goto_first_page, goto_first_page);
 BIND_WIDGET(Fpaper_goto_last_page, goto_last_page);
 BIND_WIDGET(Fpaper_scroll_to_page_start, scroll_to_page_start);
 BIND_WIDGET(Fpaper_scroll_to_page_end, scroll_to_page_end);
+BIND_WIDGET(Fpaper_fit_width, fit_width);
+BIND_WIDGET(Fpaper_fit_height, fit_height);
 
 static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                  emacs_value (*func)(emacs_env *env, ptrdiff_t nargs,
@@ -193,6 +195,8 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, Fpaper_goto_last_page, "paper--goto-last-page", "");
   mkfn(env, 1, 1, Fpaper_scroll_to_page_start, "paper--scroll-to-page-start", "");
   mkfn(env, 1, 1, Fpaper_scroll_to_page_end, "paper--scroll-to-page-end", "");
+  mkfn(env, 1, 1, Fpaper_fit_width, "paper--fit-width", "");
+  mkfn(env, 1, 1, Fpaper_fit_height, "paper--fit-height", "");
   provide(env, "paper-module");
   return 0;
 }

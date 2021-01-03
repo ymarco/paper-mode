@@ -89,6 +89,8 @@ void goto_first_page(GtkWidget *widget);
 void goto_last_page(GtkWidget *widget);
 void scroll_to_page_start(GtkWidget *widget);
 void scroll_to_page_end(GtkWidget *widget);
+void fit_width(GtkWidget *widget);
+void fit_height(GtkWidget *widget);
 
 PaperView *paper_view_new(char *filename, char *accel_filename);
 

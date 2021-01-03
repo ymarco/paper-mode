@@ -116,6 +116,10 @@
                 paper--scroll-to-page-start)
 (paper--bind-id paper-scroll-to-page-end
                 paper--scroll-to-page-end)
+(paper--bind-id paper-fit-height
+                paper--fit-height)
+(paper--bind-id paper-fit-width
+                paper--fit-width)
 
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings

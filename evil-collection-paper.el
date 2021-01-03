@@ -59,6 +59,9 @@
     "zt" #'paper-scroll-to-page-start
     "zb" #'paper-scroll-to-page-end
 
+    "W" #'paper-fit-width
+    "H" #'paper-fit-height
+
     "i" #'ignore
     "I" #'ignore
     "a" #'ignore
