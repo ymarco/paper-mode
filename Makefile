@@ -1,7 +1,8 @@
 CFLAGS = -Wall -Wextra -Wno-unused-parameter -Wshadow
 CFLAGS += -std=c99 -fpic
-CFLAGS += `pkg-config --cflags gtk+-3.0 --libs cairo`
-CFLAGS += -I/usr/local/include
+LIBS = gtk+-3.0 cairo
+CFLAGS += `pkg-config --cflags $(LIBS)`
+LDFLAGS += `pkg-config --libs $(LIBS)`
 CFLAGS += -lm
 CFLAGS += -lmupdf -lmupdf-third
 
@@ -17,8 +18,8 @@ ifeq ($(O_RELEASE),1)
 endif
 
 
-paper-module.so: paper-module.o PaperView.o
-	$(CC) $(CFLAGS) -shared -o $@ $^ /usr/lib64/libmupdf.a /usr/lib64/libmupdf-third.a
+paper-module.so: paper-module.o PaperView.o -lmupdf -lmupdf-third
+	$(CC) $(CFLAGS) -shared $(LDFLAGS) -o $@ $^
 
 paper-module.o: PaperView.h from-webkit.h emacs-module.h
 
