@@ -30,7 +30,7 @@ typedef struct DocInfo {
   fz_outline *outline;
   pdf_document *pdf;
   pdf_annot *selected_annot;
-  float zoom;   // in precentage
+  float zoom;   // 1.0 means no scaling
   float rotate; // in degrees
   /* pages[location.chapter][location.page] = page */
   Page **pages;

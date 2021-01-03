@@ -74,7 +74,7 @@ Page *get_page(DocInfo *doci, fz_location loc) {
 Page *get_cur_page(DocInfo *doci) { return get_page(doci, doci->location); }
 
 fz_matrix get_scale_ctm(DocInfo *doci, Page *page) {
-  return fz_transform_page(page->page_bounds, doci->zoom, doci->rotate);
+  return fz_transform_page(page->page_bounds, 72.0f * doci->zoom, doci->rotate);
 }
 
 /*
@@ -507,6 +507,10 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   fz_point unscaled_diff = fz_transform_point(scaled_diff, new_scale_ctm_inv);
   doci->scroll = unscaled_diff;
   scroll_pages(doci);
+  /* Page *page = get_cur_page(doci); */
+  /* fprintf(stderr, "zoom: %f, actual: %f\n", doci->zoom * 1.38, */
+  /*         fz_transform_rect(page->page_bounds, get_scale_ctm(doci, page)).y1 / */
+  /*             page->page_bounds.y1 * 100); */
 }
 
 /*
@@ -650,14 +654,14 @@ void fit_width(GtkWidget *widget) {
   int w = gtk_widget_get_allocated_width(widget);
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.x = 0;
-  c->doci.zoom = ((float)w / get_cur_page(&c->doci)->page_bounds.x1) * 100.0f;
+  c->doci.zoom = ((float)w / get_cur_page(&c->doci)->page_bounds.x1);
 }
 
 void fit_height(GtkWidget *widget) {
   int h = gtk_widget_get_allocated_height(widget);
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.y = 0;
-  c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1) * 100.0f;
+  c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1);
 }
 
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
@@ -691,7 +695,7 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   fz_location loc = {0, 0};
   doci->location = loc;
   doci->colorspace = fz_device_rgb(ctx);
-  doci->zoom = 100.0f;
+  doci->zoom = 1.0f;
   /* Count the number of pages. */
   doci->chapter_count = fz_count_chapters(ctx, doci->doc);
   if (!(doci->pages = calloc(sizeof(Page *), doci->chapter_count))) {
