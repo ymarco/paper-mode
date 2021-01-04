@@ -358,6 +358,9 @@ static gboolean query_tooltip(GtkWidget *widget, int x, int y,
   } else {
     float _x, _y;
     fz_location loc = fz_resolve_link(ctx, c->doci.doc, link->uri, &_x, &_y);
+    // start pages and chapters from 1
+    loc.chapter += 1;
+    loc.page += 1;
     // TODO display the label of the page instead the absolute number. I'm not
     // sure its possible in mupdf though.
     if (c->doci.chapter_count > 1)
@@ -507,10 +510,6 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   fz_point unscaled_diff = fz_transform_point(scaled_diff, new_scale_ctm_inv);
   doci->scroll = unscaled_diff;
   scroll_pages(doci);
-  /* Page *page = get_cur_page(doci); */
-  /* fprintf(stderr, "zoom: %f, actual: %f\n", doci->zoom * 1.38, */
-  /*         fz_transform_rect(page->page_bounds, get_scale_ctm(doci, page)).y1 / */
-  /*             page->page_bounds.y1 * 100); */
 }
 
 /*
