@@ -3,8 +3,22 @@
 Experimental PDF viewer for Emacs, rendering with mupdf and using gtk directly
 on an Emacs window from a dynamic module - the method invented by [[https://github.com/akirakyle/emacs-webkit][emcas-webkit]].
 
-Currently I'm developing the viewer as a separate executable that opens a gtk
-window. Once I have mouse controls and things stabilize I'll embed it into Emacs.
+* Usage
+** Install:
+*Dependencies*: mupdf 1.17+, gtk3. Currently doesn't need emacs28 for ~open_channel~.
+1. Clone the repo
+2. Run ~make~
+3. Add repo dir to load path
+** Config
+With [[https://github.com/jwiegley/use-package/][use-package]]:
+#+begin_src emacs-lisp
+(use-package! paper
+  :mode ("\\.pdf\\'"  . paper-mode)
+  :mode ("\\.epub\\'"  . paper-mode)
+  :config
+  (require 'evil-collection-paper)
+  (evil-collection-paper-setup))
+#+end_src
 
 * Todo list
 - [-] Outside Emacs

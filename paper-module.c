@@ -50,7 +50,8 @@ static emacs_value Fpaper_new(emacs_env *env, ptrdiff_t nargs,
     return signal_memory_full(env);
   }
 
-  c->fd = env->open_channel(env, channel);
+  // TODO communicate back to lisp
+  /* c->fd = env->open_channel(env, channel); */
   if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
     return Qnil;
 
