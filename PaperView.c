@@ -324,12 +324,17 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
     fz_snap_selection(ctx, page->page_text, &page->selection_start,
                       &page->selection_end, c->doci.selection_mode);
 
-    int max_quads_count = 1024;
-    if (!page->cache.selection_quads)
-      page->cache.selection_quads = malloc(max_quads_count * sizeof(fz_quad));
-    page->cache.selection_quads_count = fz_highlight_selection(
-        ctx, page->page_text, page->selection_start, page->selection_end,
-        page->cache.selection_quads, max_quads_count);
+    int max_count = 1024;
+    int count;
+    do {
+      page->cache.selection_quads =
+          realloc(page->cache.selection_quads, max_count * sizeof(fz_quad));
+      count = fz_highlight_selection(ctx, page->page_text,
+                                     page->selection_start, page->selection_end,
+                                     page->cache.selection_quads, max_count);
+      max_count *= 2;
+    } while (count == max_count);
+    page->cache.selection_quads_count = count;
   }
 }
 
