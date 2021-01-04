@@ -170,6 +170,20 @@ BIND_WIDGET(Fpaper_scroll_to_page_end, scroll_to_page_end);
 BIND_WIDGET(Fpaper_fit_width, fit_width);
 BIND_WIDGET(Fpaper_fit_height, fit_height);
 
+emacs_value Fpaper_get_selection(emacs_env *env, ptrdiff_t nargs,
+                                 emacs_value args[], void *data) {
+  UNUSED(nargs);
+  UNUSED(data);
+  Client *c = env->get_user_ptr(env, args[0]);
+  size_t len = 0;
+  char *sel = get_selection(c->view, &len);
+  if (!sel)
+    return Qnil;
+  emacs_value res = env->make_string(env, sel, len);
+  free(sel);
+  return res;
+}
+
 static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                  emacs_value (*func)(emacs_env *env, ptrdiff_t nargs,
                                      emacs_value *args, void *data),
@@ -209,6 +223,8 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, Fpaper_scroll_to_page_end, "paper--scroll-to-page-end", "");
   mkfn(env, 1, 1, Fpaper_fit_width, "paper--fit-width", "");
   mkfn(env, 1, 1, Fpaper_fit_height, "paper--fit-height", "");
+  mkfn(env, 1, 1, Fpaper_get_selection, "paper--get-selection", "");
+
   // done
   provide(env, "paper-module");
   return 0;

@@ -62,6 +62,8 @@
     "W" #'paper-fit-width
     "H" #'paper-fit-height
 
+    "y" #'paper-copy-selection
+
     "i" #'ignore
     "I" #'ignore
     "a" #'ignore

@@ -129,6 +129,44 @@ static void highlight_selection(fz_context *ctx, Page *page, fz_pixmap *pixmap,
   }
 }
 
+/*
+ * Return a string of the text selection spanning on all the pages with
+ * selection. It's your responsibility to free the returned pointer. *res_len is
+ * set to the strlen of the return value.
+ * Return NULL if no selection is available.
+ */
+char *get_selection(GtkWidget *widget, size_t *res_len) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  if (!c->doci.selection_active)
+    return NULL;
+  char *res = NULL;
+  // oh, what would I do to use open_memstream. Not standardized though.
+  size_t len = 0;
+  size_t size = 0;
+  for (fz_location loc = c->doci.selection_loc_start;
+       locationcmp(loc, c->doci.selection_loc_end) <= 0;
+       loc = fz_next_page(c->doci.ctx, c->doci.doc, loc)) {
+    Page *page = get_page(&c->doci, loc);
+    char *page_sel =
+        fz_copy_selection(c->doci.ctx, page->page_text, page->selection_start,
+                          page->selection_end, 0);
+    size_t n = strlen(page_sel);
+    size_t new_len = n + len;
+    if (new_len > size) {
+      size = fz_maxi(new_len + 1, size * 2 + 1);
+      res = realloc(res, size);
+      if (!res)
+        return NULL;
+    }
+    memcpy(&res[len], page_sel, n);
+    len = new_len;
+  }
+  if (res)
+    res[len] = '\0';
+  *res_len = len;
+  return res;
+}
+
 static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   // allocate only if dimensions changed
@@ -236,7 +274,6 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
                         &orig_point, &c->doci.selection_loc_start);
     Page *page = get_page(&c->doci, c->doci.selection_loc_start);
     page->selection_start = orig_point;
-    gtk_widget_queue_draw(widget);
     switch (event->type) {
     case GDK_BUTTON_PRESS:
       c->doci.selection_mode = FZ_SELECT_CHARS;

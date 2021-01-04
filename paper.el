@@ -120,6 +120,11 @@
                 paper--fit-height)
 (paper--bind-id paper-fit-width
                 paper--fit-width)
+(defun paper-copy-selection ()
+  (interactive)
+  (kill-new (paper--get-selection paper--id))
+  (let ((message-log-max nil))
+    (message "Copied!")))
 
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings
