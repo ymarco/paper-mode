@@ -160,6 +160,7 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
     }
     memcpy(&res[len], page_sel, n);
     len = new_len;
+    fz_free(c->doci.ctx, page_sel);
   }
   if (res)
     res[len] = '\0';
@@ -324,7 +325,8 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
                       &page->selection_end, c->doci.selection_mode);
 
     int max_quads_count = 1024;
-    page->cache.selection_quads = malloc(max_quads_count * sizeof(fz_quad));
+    if (!page->cache.selection_quads)
+      page->cache.selection_quads = malloc(max_quads_count * sizeof(fz_quad));
     page->cache.selection_quads_count = fz_highlight_selection(
         ctx, page->page_text, page->selection_start, page->selection_end,
         page->cache.selection_quads, max_quads_count);
