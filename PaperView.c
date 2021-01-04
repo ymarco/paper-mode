@@ -118,10 +118,10 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
-static void highlight_selection(fz_context *ctx, Page *page, fz_pixmap *pixmap,
-                                fz_matrix ctm) {
-  for (int i = 0; i < page->cache.selection_quads_count; i++) {
-    fz_quad box = fz_transform_quad(page->cache.selection_quads[i], ctm);
+static void highlight_quads(fz_context *ctx, fz_quad *quads, int count,
+                            fz_pixmap *pixmap, fz_matrix ctm) {
+  for (int i = 0; i < count; i++) {
+    fz_quad box = fz_transform_quad(quads[i], ctm);
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xE8,
         fz_round_rect(fz_make_rect(box.ul.x, box.ul.y, box.lr.x, box.lr.y)));
@@ -228,7 +228,8 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     // highlight text selection
     if ((c->doci.selection_active || c->doci.selecting) &&
         locationcmp(loc, c->doci.selection_loc_end) <= 0) {
-      highlight_selection(ctx, page, pixmap, draw_page_ctm);
+      highlight_quads(ctx, page->cache.selection_quads,
+                      page->cache.selection_quads_count, pixmap, draw_page_ctm);
     }
     // highlight selected link
     if (page->cache.highlighted_link) {
