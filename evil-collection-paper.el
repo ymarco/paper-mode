@@ -46,7 +46,9 @@
     "l" #'paper-scroll-right
 
     "K" #'paper-scroll-prev-page
+    (kbd "C-k") #'paper-scroll-prev-page
     "J" #'paper-scroll-next-page
+    (kbd "C-j") #'paper-scroll-next-page
 
     "-" #'paper-zoom-out
     "=" #'paper-zoom-in

@@ -153,7 +153,7 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
     size_t n = strlen(page_sel);
     size_t new_len = n + len;
     if (new_len > size) {
-      size = fz_maxi(new_len + 1, size * 2 + 1);
+      size = fz_maxi(new_len + 1, size * 2);
       res = realloc(res, size);
       if (!res)
         return NULL;
