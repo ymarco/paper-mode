@@ -11,7 +11,8 @@ const int PAGE_SEPARATOR_HEIGHT = 18;
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
 int locationcmp(fz_location a, fz_location b) {
-  return a.chapter - b.chapter || a.page - b.page;
+  int chapcmp = a.chapter - b.chapter;
+  return chapcmp != 0 ? chapcmp : a.page - b.page;
 }
 
 void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
