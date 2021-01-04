@@ -495,7 +495,7 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   fz_location original_loc;
   trace_point_to_page(widget, doci, point, &original_point_in_page,
                       &original_loc);
-  for (fz_location loc = original_loc; locationcmp(doci->location, loc) < 0;
+  for (fz_location loc = original_loc; locationcmp(loc, doci->location) > 0;
        loc = fz_previous_page(ctx, doci->doc, loc)) {
     original_point_in_page.y +=
         get_page(doci, loc)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
@@ -522,7 +522,10 @@ void scroll_relatively(GtkWidget *widget, fz_point mult) {
   int h = gtk_widget_get_allocated_height(widget);
   Page *page = get_cur_page(&c->doci);
   // don't include rotation
-  fz_matrix scale_ctm = fz_transform_page(page->page_bounds, c->doci.zoom, 0);
+  float rotate = c->doci.rotate;
+  c->doci.rotate = 0;
+  fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
+  c->doci.rotate = rotate;
   fz_matrix scale_ctm_inv = fz_invert_matrix(scale_ctm);
   fz_point scrolled =
       fz_transform_point(fz_make_point(mult.x * w, mult.y * h), scale_ctm_inv);
