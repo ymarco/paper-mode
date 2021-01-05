@@ -126,6 +126,10 @@
   (let ((message-log-max nil))
     (message "Copied!")))
 
+(defun paper-search (needle)
+  (interactive "Msearch: ")
+  (paper--set-search paper--id needle))
+
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings
                          (define-key map "-" #'paper-zoom-out)

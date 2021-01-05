@@ -66,6 +66,8 @@
 
     "y" #'paper-copy-selection
 
+    "/" #'paper-search
+
     "i" #'ignore
     "I" #'ignore
     "a" #'ignore

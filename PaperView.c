@@ -168,6 +168,23 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
   return res;
 }
 
+void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
+                                    char *search) {
+  if (page->cache.search_update_time > doci->search_update_time)
+    return;
+  int max_count = 1024;
+  int count;
+  do {
+    page->cache.search_quads =
+        realloc(page->cache.search_quads, max_count * sizeof(fz_quad));
+    count = fz_search_stext_page(ctx, page->page_text, search,
+                                 page->cache.search_quads, max_count);
+    max_count *= 2;
+  } while (count == max_count);
+  page->cache.search_quads_count = count;
+  page->cache.search_update_time = clock();
+}
+
 static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   // allocate only if dimensions changed
@@ -230,6 +247,12 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
         locationcmp(loc, c->doci.selection_loc_end) <= 0) {
       highlight_quads(ctx, page->cache.selection_quads,
                       page->cache.selection_quads_count, pixmap, draw_page_ctm);
+    }
+    // highlight search results
+    if (c->doci.search[0]) {
+      ensure_search_cache_is_updated(ctx, &c->doci, page, c->doci.search);
+      highlight_quads(ctx, page->cache.search_quads,
+                      page->cache.search_quads_count, pixmap, draw_page_ctm);
     }
     // highlight selected link
     if (page->cache.highlighted_link) {
@@ -710,6 +733,15 @@ void fit_height(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.y = 0;
   c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1);
+}
+
+void set_search(GtkWidget *widget, char *needle) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  if (strcmp(needle, c->doci.search)) {
+    strcpy(c->doci.search, needle);
+    c->doci.search_update_time = clock();
+    gtk_widget_queue_draw(widget);
+  }
 }
 
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {

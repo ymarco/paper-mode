@@ -3,10 +3,15 @@
 #include <gtk/gtk.h>
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h> /* for pdf specifics and forms */
+#include <time.h>
 
 typedef struct PageRenderCache {
   fz_quad *selection_quads; // allocated on demand by complete_selection()
   int selection_quads_count;
+  fz_quad *search_quads; // allocated on demand by complete_selection()
+  int search_quads_count;
+  clock_t search_update_time;
+
   fz_link *highlighted_link;
 } PageRenderCache;
 
@@ -47,6 +52,8 @@ typedef struct DocInfo {
   int selection_mode; // FZ_SELECT_(CHARS|WORDS|LINES)
   char filename[PATH_MAX];
   char accel[PATH_MAX];
+  char search[PATH_MAX];
+  clock_t search_update_time;
   fz_colorspace *colorspace;
   fz_context *ctx;
 } DocInfo;
@@ -92,6 +99,7 @@ void scroll_to_page_end(GtkWidget *widget);
 void fit_width(GtkWidget *widget);
 void fit_height(GtkWidget *widget);
 char *get_selection(GtkWidget *widget, size_t *res_len);
+void set_search(GtkWidget *widget, char *needle);
 
 PaperView *paper_view_new(char *filename, char *accel_filename);
 

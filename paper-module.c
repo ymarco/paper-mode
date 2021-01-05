@@ -185,6 +185,19 @@ emacs_value Fpaper_get_selection(emacs_env *env, ptrdiff_t nargs,
   return res;
 }
 
+emacs_value Fpaper_set_search(emacs_env *env, ptrdiff_t nargs,
+                              emacs_value args[], void *data) {
+  UNUSED(nargs);
+  UNUSED(data);
+  Client *c = env->get_user_ptr(env, args[0]);
+  emacs_value e_needle = args[1];
+  char needle[PATH_MAX];
+  ptrdiff_t len = PATH_MAX;
+  env->copy_string_contents(env, e_needle, needle, &len);
+  set_search(c->view, needle);
+  return Qnil;
+}
+
 static void mkfn(emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                  emacs_value (*func)(emacs_env *env, ptrdiff_t nargs,
                                      emacs_value *args, void *data),
@@ -225,6 +238,7 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, Fpaper_fit_width, "paper--fit-width", "");
   mkfn(env, 1, 1, Fpaper_fit_height, "paper--fit-height", "");
   mkfn(env, 1, 1, Fpaper_get_selection, "paper--get-selection", "");
+  mkfn(env, 2, 2, Fpaper_set_search, "paper--set-search", "");
 
   // done
   provide(env, "paper-module");
