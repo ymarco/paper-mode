@@ -127,6 +127,11 @@
   (interactive "Msearch: ")
   (paper--set-search paper--id needle))
 
+(defun paper-deselect ()
+  (interactive)
+  (paper--unset-selection paper--id)
+  (paper--unset-search paper--id))
+
 (defvar paper-mode-map (let ((map (make-sparse-keymap)))
                          ;; TODO vanilla style bindings
                          (define-key map "-" #'paper-zoom-out)

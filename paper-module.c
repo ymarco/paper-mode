@@ -170,6 +170,8 @@ BIND_WIDGET(Fpaper_scroll_to_page_start, scroll_to_page_start);
 BIND_WIDGET(Fpaper_scroll_to_page_end, scroll_to_page_end);
 BIND_WIDGET(Fpaper_fit_width, fit_width);
 BIND_WIDGET(Fpaper_fit_height, fit_height);
+BIND_WIDGET(Fpaper_unset_selection, unset_selection);
+BIND_WIDGET(Fpaper_unset_search, unset_search);
 
 emacs_value Fpaper_get_selection(emacs_env *env, ptrdiff_t nargs,
                                  emacs_value args[], void *data) {
@@ -238,6 +240,8 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, Fpaper_fit_width, "paper--fit-width", "");
   mkfn(env, 1, 1, Fpaper_fit_height, "paper--fit-height", "");
   mkfn(env, 1, 1, Fpaper_get_selection, "paper--get-selection", "");
+  mkfn(env, 1, 1, Fpaper_unset_selection, "paper--unset-selection", "");
+  mkfn(env, 1, 1, Fpaper_unset_search, "paper--unset-search", "");
   mkfn(env, 2, 2, Fpaper_set_search, "paper--set-search", "");
 
   // done

@@ -735,6 +735,19 @@ void fit_height(GtkWidget *widget) {
   c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1);
 }
 
+void unset_selection(GtkWidget *widget) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  c->doci.selection_active = 0;
+  c->doci.selecting = 0;
+  gtk_widget_queue_draw(widget);
+}
+
+void unset_search(GtkWidget *widget) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  c->doci.search[0] = '\0';
+  gtk_widget_queue_draw(widget);
+}
+
 void set_search(GtkWidget *widget, char *needle) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   if (strcmp(needle, c->doci.search)) {

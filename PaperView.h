@@ -99,7 +99,9 @@ void scroll_to_page_end(GtkWidget *widget);
 void fit_width(GtkWidget *widget);
 void fit_height(GtkWidget *widget);
 char *get_selection(GtkWidget *widget, size_t *res_len);
+void unset_selection(GtkWidget *widget);
 void set_search(GtkWidget *widget, char *needle);
+void unset_search(GtkWidget *widget);
 
 PaperView *paper_view_new(char *filename, char *accel_filename);
 
