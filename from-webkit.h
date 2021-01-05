@@ -4,6 +4,7 @@
 #include "PaperView.h"
 #include "paper-module.h"
 #include <gtk/gtk.h>
+#include <assert.h>
 
 #ifdef DEBUG
 #define DEBUG_TEST 1
