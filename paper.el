@@ -106,20 +106,17 @@
                 paper--zoom 1.1)
 (paper--bind-id paper-zoom-out
                 paper--zoom (/ 1 1.1))
-(paper--bind-id paper-center
-                paper--center)
-(paper--bind-id paper-goto-first-page
-                paper--goto-first-page)
-(paper--bind-id paper-goto-last-page
-                paper--goto-last-page)
-(paper--bind-id paper-scroll-to-page-start
-                paper--scroll-to-page-start)
-(paper--bind-id paper-scroll-to-page-end
-                paper--scroll-to-page-end)
-(paper--bind-id paper-fit-height
-                paper--fit-height)
-(paper--bind-id paper-fit-width
-                paper--fit-width)
+(defmacro paper--bind-same (prefix)
+  `(paper--bind-id ,(intern (concat "paper-" (symbol-name prefix)))
+                   ,(intern (concat "paper--" (symbol-name prefix)))))
+(paper--bind-same center)
+(paper--bind-same goto-first-page)
+(paper--bind-same goto-last-page)
+(paper--bind-same scroll-to-page-start)
+(paper--bind-same scroll-to-page-end)
+(paper--bind-same fit-height)
+(paper--bind-same fit-width)
+
 (defun paper-copy-selection ()
   (interactive)
   (kill-new (paper--get-selection paper--id))
