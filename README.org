@@ -5,14 +5,15 @@ on an Emacs window from a dynamic module - the method invented by [[https://gith
 
 * Usage
 ** Install:
-*Dependencies*: mupdf 1.17+, gtk3. Currently doesn't need emacs28 for ~open_channel~.
+*To build the shared object you'll need*: mupdf 1.17+ dev version, gtk3 dev version.
+It should work with Emacs 27.
 1. Clone the repo
 2. Run ~make~
 3. Add repo dir to load path
 ** Config
 With [[https://github.com/jwiegley/use-package/][use-package]]:
 #+begin_src emacs-lisp
-(use-package! paper
+(use-package paper
   :mode ("\\.pdf\\'"  . paper-mode)
   :mode ("\\.epub\\'"  . paper-mode)
   :config
