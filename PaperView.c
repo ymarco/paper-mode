@@ -172,7 +172,7 @@ void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
                                     char *search) {
   if (page->cache.search_update_time > doci->search_update_time)
     return;
-  int max_count = 1024;
+  int max_count = 256;
   int count;
   do {
     page->cache.search_quads =
@@ -348,7 +348,7 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
     fz_snap_selection(ctx, page->page_text, &page->selection_start,
                       &page->selection_end, c->doci.selection_mode);
 
-    int max_count = 1024;
+    int max_count = 256;
     int count;
     do {
       page->cache.selection_quads =
