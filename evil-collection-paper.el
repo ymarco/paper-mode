@@ -68,7 +68,7 @@
 
     "/" #'paper-search
     ;; TODO binding to ESC doesn't work
-    (kbd "ESC") #'paper-deselect
+    ;; (kbd "ESC") #'paper-deselect
 
     "i" #'ignore
     "I" #'ignore
