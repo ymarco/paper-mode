@@ -15,16 +15,6 @@ int locationcmp(fz_location a, fz_location b) {
   return chapcmp != 0 ? chapcmp : a.page - b.page;
 }
 
-void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
-  fz_context *ctx = doci->ctx;
-  if (doci->pages[chapter])
-    return;
-  doci->page_count_for_chapter[chapter] =
-      fz_count_chapter_pages(ctx, doci->doc, chapter);
-  doci->pages[chapter] =
-      calloc(sizeof(Page), doci->page_count_for_chapter[chapter]);
-}
-
 void drop_page(fz_context *ctx, Page *page) {
   if (!page)
     return;
@@ -36,10 +26,8 @@ void drop_page(fz_context *ctx, Page *page) {
   free(page->cache.selection_quads);
 }
 
-void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
-  ensure_chapter_is_loaded(doci, location.chapter);
+void load_page(DocInfo *doci, fz_location location, Page *page) {
   fz_context *ctx = doci->ctx;
-  Page *page = &doci->pages[location.chapter][location.page];
   if (page->page)
     return;
   fz_try(ctx) {
@@ -66,10 +54,22 @@ void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
   }
 }
 
-// TODO handle exceptions wherever get_page is used
+int prev_ind_in_page_cache(int i) {
+  return (i + PAGE_CACHE_LEN - 1) % PAGE_CACHE_LEN;
+}
+
 Page *get_page(DocInfo *doci, fz_location loc) {
-  ensure_page_is_loaded(doci, loc);
-  return &doci->pages[loc.chapter][loc.page];
+  for (int i = 0; i < PAGE_CACHE_LEN; i++) {
+    if (locationcmp(loc, doci->page_cache.locs[i]) == 0) {
+      return &doci->page_cache.pages[i];
+    }
+  }
+  int new_first = prev_ind_in_page_cache(doci->page_cache.first);
+  load_page(doci, loc, &doci->page_cache.pages[new_first]);
+  fprintf(stderr, "%f\n", doci->page_cache.pages[new_first].page_bounds.y1);
+  doci->page_cache.locs[new_first] = loc;
+  doci->page_cache.first = new_first;
+  return &doci->page_cache.pages[new_first];
 }
 
 Page *get_cur_page(DocInfo *doci) { return get_page(doci, doci->location); }
@@ -791,16 +791,8 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   doci->zoom = 1.0f;
   /* Count the number of pages. */
   doci->chapter_count = fz_count_chapters(ctx, doci->doc);
-  if (!(doci->pages = calloc(sizeof(Page *), doci->chapter_count))) {
-    fz_drop_context(ctx);
-    return 0;
-  }
-  if (!(doci->page_count_for_chapter =
-            calloc(sizeof(int *), doci->chapter_count))) {
-    fz_drop_context(ctx);
-    free(doci->pages);
-    return 0;
-  }
+  // invalidate location keys on the page cache
+  memset(doci->page_cache.locs, -1, sizeof(doci->page_cache.locs));
   return 1;
 }
 
@@ -837,21 +829,13 @@ static void paper_view_finalize(GObject *object) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(object));
   fz_context *ctx = c->doci.ctx;
   cairo_surface_destroy(c->image_surf);
-  Page *chapter_pages;
-  for (int chapter = 0; chapter < c->doci.chapter_count; chapter++) {
-    chapter_pages = c->doci.pages[chapter];
-    if (chapter_pages) {
-      for (int page = 0; page < c->doci.page_count_for_chapter[chapter]; page++)
-        drop_page(ctx, &chapter_pages[page]);
-      free(chapter_pages);
-    }
+  for (int i = 0; i < PAGE_CACHE_LEN; i++) {
+    drop_page(ctx, &c->doci.page_cache.pages[i]);
   }
   fz_drop_document(ctx, c->doci.doc);
   fz_drop_outline(ctx, c->doci.outline);
   pdf_drop_document(ctx, c->doci.pdf);
   pdf_drop_annot(ctx, c->doci.selected_annot);
-  free(c->doci.pages);
-  free(c->doci.page_count_for_chapter);
   fz_drop_context(c->doci.ctx);
   G_OBJECT_CLASS(paper_view_parent_class)->finalize(object);
 }

@@ -29,6 +29,8 @@ typedef struct Page {
 
 extern const int PAGE_SEPARATOR_HEIGHT;
 
+#define PAGE_CACHE_LEN 32
+
 typedef struct DocInfo {
   fz_document *doc;
   fz_location location;
@@ -37,14 +39,18 @@ typedef struct DocInfo {
   pdf_annot *selected_annot;
   float zoom;   // 1.0 means no scaling
   float rotate; // in degrees
-  /* pages[location.chapter][location.page] = page */
-  Page **pages;
   /* 0 <= scroll.y <= get_page(doci, doci.location).page_bounds.y1 +
    * PAGE_SEPARATOR_HEIGHT*/
   /* scroll is always relative to current page bounds */
   fz_point scroll;
   int chapter_count;
-  int *page_count_for_chapter;
+  // cache of pages implemented as a circular array with newly fetched pages at
+  // the front
+  struct PageCache {
+    Page pages[PAGE_CACHE_LEN];
+    fz_location locs[PAGE_CACHE_LEN];
+    int first;
+  } page_cache;
   gboolean selecting;
   gboolean selection_active;
   fz_location selection_loc_start;
