@@ -66,7 +66,6 @@ Page *get_page(DocInfo *doci, fz_location loc) {
   }
   int new_first = prev_ind_in_page_cache(doci->page_cache.first);
   load_page(doci, loc, &doci->page_cache.pages[new_first]);
-  fprintf(stderr, "%f\n", doci->page_cache.pages[new_first].page_bounds.y1);
   doci->page_cache.locs[new_first] = loc;
   doci->page_cache.first = new_first;
   return &doci->page_cache.pages[new_first];
