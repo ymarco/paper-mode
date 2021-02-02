@@ -665,6 +665,7 @@ void scroll_to_page_end(GtkWidget *widget) {
   c->doci.scroll.y = fz_transform_point(fz_make_point(0, scroll_scaled),
                                         fz_invert_matrix(scale_ctm))
                          .y;
+  scroll_pages(&c->doci);
 }
 
 void scroll_whole_pages(GtkWidget *widget, int i) {
