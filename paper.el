@@ -66,8 +66,12 @@
                 (switch-to-prev-buffer window)))))))))
 
 (defun paper--kill-buffer ()
-  (paper--hide paper--id)
-  (paper--destroy paper--id))
+  (let* ((process paper--process)
+         (buffer (process-buffer process)))
+    (paper--hide paper--id)
+    (paper--destroy paper--id)
+    (delete-process process)
+    (kill-buffer buffer)))
 
 (defun paper--delete-frame (frame)
   (let ((new-frame (cl-some
