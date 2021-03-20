@@ -6,12 +6,15 @@
 #include <time.h>
 
 typedef struct PageRenderCache {
-  fz_quad *selection_quads; // allocated on demand by complete_selection()
-  int selection_quads_count;
-  fz_quad *search_quads; // allocated on demand by complete_selection()
-  int search_quads_count;
-  clock_t search_update_time;
-
+  struct Selection {
+    fz_quad *quads; // allocated on demand by complete_selection()
+    int quads_count;
+  } selection;
+  struct Search {
+    fz_quad *quads; // allocated on demand by complete_selection()
+    int quads_count;
+    clock_t update_time;
+  } search;
   fz_link *highlighted_link;
 } PageRenderCache;
 
