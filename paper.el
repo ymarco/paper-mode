@@ -132,11 +132,18 @@
   (paper--unset-selection paper--id)
   (paper--unset-search paper--id))
 
-(defvar paper-mode-map (let ((map (make-sparse-keymap)))
-                         ;; TODO vanilla style bindings
-                         (define-key map "-" #'paper-zoom-out)
-                         (define-key map "=" #'paper-zoom-in)
-                         map)
+(defvar paper-mode-map
+  (let ((map (make-sparse-keymap)))
+    ;; TODO have someone who uses vanilla-style bindings do it
+    (define-key map "-" #'paper-zoom-out)
+    (define-key map [remap text-scale-decrease] #'paper-zoom-out)
+    (define-key map "=" #'paper-zoom-in)
+    (define-key map [remap text-scale-increase] #'paper-zoom-in)
+    (define-key map [remap next-line] #'paper-scroll-down)
+    (define-key map [remap previous-line] #'paper-scroll-up)
+    (define-key map [remap scroll-up-command] #'paper-scroll-window-up)
+    (define-key map [remap scroll-down-command] #'paper-scroll-window-up)
+    map)
   "Keymap for `paper-mode'.")
 
 ;;;###autoload

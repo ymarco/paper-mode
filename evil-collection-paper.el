@@ -40,10 +40,10 @@
   (evil-collection-define-key 'normal 'paper-mode-map
     "q" 'quit-window
 
-    "k" #'paper-scroll-up
-    "j" #'paper-scroll-down
-    "h" #'paper-scroll-left
-    "l" #'paper-scroll-right
+    [remap evil-previous-line] #'paper-scroll-up
+    [remap evil-next-line] #'paper-scroll-down
+    [remap evil-forward-char] #'paper-scroll-left
+    [remap evil-backward-char] #'paper-scroll-right
 
     "K" #'paper-scroll-prev-page
     (kbd "C-k") #'paper-scroll-prev-page
@@ -51,15 +51,17 @@
     (kbd "C-j") #'paper-scroll-next-page
 
     "-" #'paper-zoom-out
+    [remap text-scale-decrease] #'paper-zoom-out
     "=" #'paper-zoom-in
+    [remap text-scale-increase] #'paper-zoom-in
 
     "c" #'paper-center
 
-    "gg" #'paper-goto-first-page
-    "G" #'paper-goto-last-page
+    [remap evil-goto-first-line] #'paper-goto-first-page
+    [remap evil-goto-line] #'paper-goto-last-page
 
-    "zt" #'paper-scroll-to-page-start
-    "zb" #'paper-scroll-to-page-end
+    [remap evil-scroll-line-to-top] #'paper-scroll-to-page-start
+    [remap evil-scroll-line-to-bottom] #'paper-scroll-to-page-end
 
     "W" #'paper-fit-width
     "H" #'paper-fit-height
