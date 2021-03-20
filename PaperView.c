@@ -28,8 +28,6 @@ void drop_page(fz_context *ctx, Page *page) {
 
 void load_page(DocInfo *doci, fz_location location, Page *page) {
   fz_context *ctx = doci->ctx;
-  if (page->page)
-    return;
   fz_try(ctx) {
     page->page =
         fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
