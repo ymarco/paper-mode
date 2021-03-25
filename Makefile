@@ -4,7 +4,7 @@ LIBS = gtk+-3.0 cairo
 CFLAGS += `pkg-config --cflags $(LIBS)`
 LDFLAGS += `pkg-config --libs $(LIBS)`
 CFLAGS += -lm
-CFLAGS += -lmupdf -lmupdf-third
+CFLAGS += -lmupdf
 
 O_DEBUG := 0  # debug binary
 O_RELEASE := 0  # debug binary
@@ -18,7 +18,7 @@ ifeq ($(O_RELEASE),1)
 endif
 
 
-paper-module.so: paper-module.o PaperView.o -lmupdf -lmupdf-third
+paper-module.so: paper-module.o PaperView.o
 	$(CC) $(CFLAGS) -shared $(LDFLAGS) -o $@ $^
 
 paper-module.o: PaperView.h from-webkit.h emacs-module.h
