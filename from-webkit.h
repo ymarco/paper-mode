@@ -5,6 +5,7 @@
 #include "paper-module.h"
 #include <gtk/gtk.h>
 #include <assert.h>
+#include <errno.h>
 
 #ifdef DEBUG
 #define DEBUG_TEST 1
