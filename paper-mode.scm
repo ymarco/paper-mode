@@ -48,6 +48,9 @@
                       ;; for some reason the above doesn't actually remove the (require ...)
                       (substitute* "paper.el" (("\\(require 'paper-module\\)")
                                                ""))
+                      ;; (unless module-file-suffix ...) breaks byte-compilation
+                      (substitute* "paper.el" (("\\(unless module-file-suffix\\)")
+                                               "(unless t"))
                       #t))
         (add-before 'install 'make
                     ;; Run make.
