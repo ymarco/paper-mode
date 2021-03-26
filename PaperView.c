@@ -132,7 +132,7 @@ static void highlight_quads(Quads *quads, cairo_t *cr, fz_matrix ctm) {
   for (int i = 0; i < quads->count; i++) {
     fz_quad box = fz_transform_quad(quads->quads[i], ctm);
     double gray = 0.909;
-    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0-gray);
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0 - gray);
     cairo_move_to(cr, box.ul.x, box.ul.y);
     cairo_line_to(cr, box.ur.x, box.ur.y);
     cairo_line_to(cr, box.lr.x, box.lr.y);
@@ -348,16 +348,22 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
     fz_point orig_point;
     trace_point_to_page(widget, &c->doci, fz_make_point(event->x, event->y),
                         &orig_point, &c->doci.selection.loc_start);
+    c->doci.selection.loc_end = c->doci.selection.loc_start;
     c->doci.selection.start = orig_point;
+    c->doci.selection.end = orig_point;
     switch (event->type) {
     case GDK_BUTTON_PRESS:
       c->doci.selection.mode = FZ_SELECT_CHARS;
       break;
     case GDK_2BUTTON_PRESS:
       c->doci.selection.mode = FZ_SELECT_WORDS;
+      c->doci.selection.id++;
+      gtk_widget_queue_draw(widget);
       break;
     case GDK_3BUTTON_PRESS:
       c->doci.selection.mode = FZ_SELECT_LINES;
+      c->doci.selection.id++;
+      gtk_widget_queue_draw(widget);
       break;
     default:
       fprintf(stderr, "Unhandled button press type\n");
