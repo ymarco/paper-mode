@@ -189,7 +189,7 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
     get_selection_bounds_for_page(c->doci.ctx, &c->doci, loc, &sel_start,
                                   &sel_end);
     char *page_sel = fz_copy_selection(c->doci.ctx, page->page_text, sel_start,
-                                       sel_start, 0);
+                                       sel_end, 0);
     size_t n = strlen(page_sel);
     size_t new_len = n + len;
     if (new_len > size) {
