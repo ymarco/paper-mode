@@ -23,6 +23,7 @@ void drop_page(fz_context *ctx, Page *page) {
   fz_drop_separations(ctx, page->seps);
   fz_drop_link(ctx, page->links);
   fz_drop_display_list(ctx, page->display_list);
+  cairo_surface_destroy(page->cache.rendered.surface);
   free(page->cache.selection.quads.quads);
   free(page->cache.search.quads.quads);
 }
@@ -54,6 +55,7 @@ void load_page(DocInfo *doci, fz_location location, Page *page) {
   }
   PageRenderCache *cache = &page->cache;
   cache->selection.id = 0;
+  cache->rendered.id = 0;
   cache->search.id = 0;
 }
 
@@ -126,14 +128,17 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
-static void highlight_quads(fz_context *ctx, Quads *quads, fz_pixmap *pixmap,
-                            fz_matrix ctm) {
+static void highlight_quads(Quads *quads, cairo_t *cr, fz_matrix ctm) {
   for (int i = 0; i < quads->count; i++) {
     fz_quad box = fz_transform_quad(quads->quads[i], ctm);
-    fz_clear_pixmap_rect_with_value(
-        ctx, pixmap, 0xE8,
-        fz_round_rect(fz_make_rect(box.ul.x, box.ul.y, box.lr.x, box.lr.y)));
-    // TODO actually fill in the quad instead of assuming its a rectangle
+    double gray = 0.909;
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0-gray);
+    cairo_move_to(cr, box.ul.x, box.ul.y);
+    cairo_line_to(cr, box.ur.x, box.ur.y);
+    cairo_line_to(cr, box.lr.x, box.lr.y);
+    cairo_line_to(cr, box.ll.x, box.ll.y);
+    cairo_line_to(cr, box.ul.x, box.ul.y);
+    cairo_fill(cr);
   }
 }
 
@@ -241,92 +246,89 @@ void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
   page->cache.search.quads.count = count;
 }
 
-static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
-  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  // allocate only if dimensions changed
-  if ((!c->image_surf) ||
-      cairo_image_surface_get_width(c->image_surf) != allocation->width ||
-      cairo_image_surface_get_height(c->image_surf) != allocation->height) {
-    cairo_surface_destroy(c->image_surf);
-    c->image_surf = cairo_image_surface_create(
-        CAIRO_FORMAT_RGB24, allocation->width, allocation->height);
+// doesn't render selection or search results and such, only raw page
+void render_page(fz_context *ctx, DocInfo *doci, Page *page) {
+  cairo_surface_destroy(page->cache.rendered.surface);
+  fz_matrix scale_ctm = get_scale_ctm(doci, page);
+  fz_rect float_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
+  fz_irect bounds = fz_round_rect(float_bounds);
+  page->cache.rendered.surface =
+      cairo_image_surface_create(CAIRO_FORMAT_RGB24, bounds.x1, bounds.y1);
+
+  unsigned char *image =
+      cairo_image_surface_get_data(page->cache.rendered.surface);
+  fz_pixmap *pixmap = NULL;
+  fz_device *draw_device = NULL;
+  fz_try(ctx) {
+    pixmap = fz_new_pixmap_with_bbox_and_data(ctx, doci->colorspace, bounds,
+                                              NULL, 1, image);
+    fz_clear_pixmap_with_value(ctx, pixmap, 0xFF);
+    draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
+    fz_run_display_list(ctx, page->display_list, draw_device, scale_ctm,
+                        float_bounds, NULL);
   }
+  fz_catch(ctx) {
+    fprintf(stderr, "Failed allocations: %s\n", fz_caught_message(ctx));
+  }
+  fz_close_device(ctx, draw_device);
+  fz_drop_device(ctx, draw_device);
+  fz_drop_pixmap(ctx, pixmap);
+}
+
+cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci, Page *page) {
+  if (page->cache.rendered.id != doci->rendered_id) {
+    render_page(ctx, doci, page);
+    page->cache.rendered.id = doci->rendered_id;
+  }
+  return page->cache.rendered.surface;
 }
 
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   fz_context *ctx = c->doci.ctx;
-  GdkRectangle rec = {.width = gtk_widget_get_allocated_width(widget),
-                      .height = gtk_widget_get_allocated_height(widget)};
-  allocate_pixmap(widget, &rec);
 
-  cairo_surface_t *surface = c->image_surf;
+  int height = gtk_widget_get_allocated_height(widget);
 
-  unsigned int width = cairo_image_surface_get_width(surface);
-  unsigned int height = cairo_image_surface_get_height(surface);
-
-  unsigned char *image = cairo_image_surface_get_data(surface);
-
-  fz_irect whole_rect = {.x1 = width, .y1 = height};
-  fz_rect float_rect = {.x1 = width, .y1 = height};
-
-  fz_pixmap *pixmap = NULL;
-  fz_device *draw_device = NULL;
-  fz_try(ctx) {
-    pixmap = fz_new_pixmap_with_bbox_and_data(ctx, c->doci.colorspace,
-                                              whole_rect, NULL, 1, image);
-    fz_clear_pixmap_with_value(ctx, pixmap, 0xF0);
-    draw_device = fz_new_draw_device(ctx, fz_identity, pixmap);
-  }
-  fz_catch(ctx) {
-    fprintf(stderr, "Failed allocations: %s\n", fz_caught_message(ctx));
-    return FALSE;
-  }
   // background
+  double gray = 0.941;
+  cairo_set_source_rgb(cr, gray, gray, gray);
+  cairo_paint(cr); // light gray
 
   fz_location loc = c->doci.location;
   Page *page = get_page(&c->doci, loc);
   fz_matrix scale_ctm = get_scale_ctm(&c->doci, page);
-  fz_matrix draw_page_ctm;
   fz_point stopped = fz_make_point(-c->doci.scroll.x, -c->doci.scroll.y);
+  stopped = fz_transform_point(stopped, scale_ctm);
 
-  while (fz_transform_point(stopped, scale_ctm).y < height) {
-    scale_ctm = get_scale_ctm(&c->doci, page);
-    draw_page_ctm = fz_concat(fz_translate(stopped.x, stopped.y), scale_ctm);
-    // foreground around page boundry
-    fz_rect transformed_bounds =
-        fz_transform_rect(page->page_bounds, draw_page_ctm);
-    fz_clear_pixmap_rect_with_value(ctx, pixmap, 0xFF,
-                                    fz_round_rect(transformed_bounds));
+  while (stopped.y < height) {
+    cairo_surface_t *drawn_page = get_rendered_page(ctx, &c->doci, page);
+    // draw actual page
+    // type cast to int to avoid blurriness
+    cairo_set_source_surface(cr, drawn_page, (int)stopped.x, (int)stopped.y);
+    cairo_paint(cr);
+    fz_matrix draw_page_ctm =
+        fz_concat(scale_ctm, fz_translate(stopped.x, stopped.y));
     // highlight text selection
     if ((c->doci.selection.is_active || c->doci.selection.is_in_progress) &&
         locationcmp(loc, c->doci.selection.loc_end) <= 0) {
       ensure_selection_cache_is_updated(ctx, &c->doci, loc);
-      highlight_quads(ctx, &page->cache.selection.quads, pixmap, draw_page_ctm);
+      highlight_quads(&page->cache.selection.quads, cr, draw_page_ctm);
     }
     // highlight search results
     if (c->doci.search[0]) {
       ensure_search_cache_is_updated(ctx, &c->doci, page, c->doci.search);
-      highlight_quads(ctx, &page->cache.search.quads, pixmap, draw_page_ctm);
+      highlight_quads(&page->cache.search.quads, cr, draw_page_ctm);
     }
     // highlight selected link
     if (page->cache.highlighted_link) {
-      fz_clear_pixmap_rect_with_value(
-          ctx, pixmap, 0xD0,
-          fz_round_rect(fz_transform_rect(page->cache.highlighted_link->rect,
-                                          draw_page_ctm)));
+      double light_gray = 0.909;
+      cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, light_gray);
+      fz_rect box = page->cache.highlighted_link->rect;
+      cairo_rectangle(cr, box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
     }
-    fz_try(ctx) {
-      fz_run_display_list(ctx, page->display_list, draw_device, draw_page_ctm,
-                          float_rect, NULL);
-    }
-    fz_catch(ctx) {
-      fprintf(stderr, "couldn't render page %d,%d: %s\n", loc.chapter, loc.page,
-              fz_caught_message(ctx));
-    }
-    /* fprintf(stderr, "\rscroll: %3.0f %3.0f, stopped.y: %3.0f", */
-    /*         c->doci.scroll.x, c->doci->scroll.y, stopped.y); */
-    stopped.y += page->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
+
+    stopped.y += cairo_image_surface_get_height(drawn_page);
+    stopped.y += PAGE_SEPARATOR_HEIGHT;
     fz_location next = fz_next_page(ctx, c->doci.doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
       // end of document
@@ -335,12 +337,6 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     loc = next;
     page = get_page(&c->doci, loc);
   }
-
-  fz_close_device(ctx, draw_device);
-  fz_drop_device(ctx, draw_device);
-  fz_drop_pixmap(ctx, pixmap);
-  cairo_set_source_surface(cr, surface, 0, 0);
-  cairo_paint(cr);
   return FALSE;
 }
 
@@ -601,6 +597,7 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   fz_point unscaled_diff = fz_transform_point(scaled_diff, new_scale_ctm_inv);
   doci->scroll = unscaled_diff;
   scroll_pages(doci);
+  doci->rendered_id++;
 }
 
 /*
@@ -819,6 +816,7 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // make zeroed-out seach IDs invalid to current one
   doci->search_id = 1;
   doci->selection.id = 1;
+  doci->rendered_id = 1;
   return 1;
 }
 
@@ -854,7 +852,6 @@ static void activate(GtkApplication *app, char *filename) {
 static void paper_view_finalize(GObject *object) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(object));
   fz_context *ctx = c->doci.ctx;
-  cairo_surface_destroy(c->image_surf);
   for (int i = 0; i < PAGE_CACHE_LEN; i++) {
     drop_page(ctx, &c->doci.page_cache.pages[i]);
   }

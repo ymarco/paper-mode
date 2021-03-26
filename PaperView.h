@@ -19,6 +19,10 @@ typedef struct PageRenderCache {
   CachedQuads selection;
   CachedQuads search;
   fz_link *highlighted_link;
+  struct CachedSurface {
+    cairo_surface_t *surface;
+    long unsigned int id;
+  } rendered;
 } PageRenderCache;
 
 typedef struct Page {
@@ -43,6 +47,7 @@ typedef struct DocInfo {
   pdf_annot *selected_annot;
   float zoom;   // 1.0 means no scaling
   float rotate; // in degrees
+  long unsigned int rendered_id;
   /* 0 <= scroll.y <= get_page(doci, doci.location).page_bounds.y1 +
    * PAGE_SEPARATOR_HEIGHT*/
   /* scroll is always relative to current page bounds */
@@ -75,7 +80,6 @@ typedef struct DocInfo {
 
 typedef struct _PaperViewPrivate {
   DocInfo doci;
-  cairo_surface_t *image_surf;
   GdkEventButton mouse_event;
   gboolean has_mouse_event;
   GdkCursor *default_cursor;
