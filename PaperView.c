@@ -23,11 +23,13 @@ void drop_page(fz_context *ctx, Page *page) {
   fz_drop_separations(ctx, page->seps);
   fz_drop_link(ctx, page->links);
   fz_drop_display_list(ctx, page->display_list);
-  free(page->cache.selection.quads);
+  free(page->cache.selection.quads.quads);
+  free(page->cache.search.quads.quads);
 }
 
 void load_page(DocInfo *doci, fz_location location, Page *page) {
   fz_context *ctx = doci->ctx;
+  memset(page, 0, sizeof(*page));
   fz_try(ctx) {
     page->page =
         fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
@@ -117,10 +119,10 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
-static void highlight_quads(fz_context *ctx, fz_quad *quads, int count,
-                            fz_pixmap *pixmap, fz_matrix ctm) {
-  for (int i = 0; i < count; i++) {
-    fz_quad box = fz_transform_quad(quads[i], ctm);
+static void highlight_quads(fz_context *ctx, Quads *quads, fz_pixmap *pixmap,
+                            fz_matrix ctm) {
+  for (int i = 0; i < quads->count; i++) {
+    fz_quad box = fz_transform_quad(quads->quads[i], ctm);
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xE8,
         fz_round_rect(fz_make_rect(box.ul.x, box.ul.y, box.lr.x, box.lr.y)));
@@ -169,19 +171,19 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
 
 void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
                                     char *search) {
-  if (page->cache.search.update_time > doci->search_update_time)
+  if (page->cache.search.id == doci->search_id)
     return;
+  page->cache.search.id = doci->search_id;
   int max_count = 256;
   int count;
   do {
-    page->cache.search.quads =
-        realloc(page->cache.search.quads, max_count * sizeof(fz_quad));
+    page->cache.search.quads.quads =
+        realloc(page->cache.search.quads.quads, max_count * sizeof(fz_quad));
     count = fz_search_stext_page(ctx, page->page_text, search,
-                                 page->cache.search.quads, max_count);
+                                 page->cache.search.quads.quads, max_count);
     max_count *= 2;
   } while (count == max_count);
-  page->cache.search.quads_count = count;
-  page->cache.search.update_time = clock();
+  page->cache.search.quads.count = count;
 }
 
 static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
@@ -244,14 +246,12 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     // highlight text selection
     if ((c->doci.selection_active || c->doci.selecting) &&
         locationcmp(loc, c->doci.selection_loc_end) <= 0) {
-      highlight_quads(ctx, page->cache.selection.quads,
-                      page->cache.selection.quads_count, pixmap, draw_page_ctm);
+      highlight_quads(ctx, &page->cache.selection.quads, pixmap, draw_page_ctm);
     }
     // highlight search results
     if (c->doci.search[0]) {
       ensure_search_cache_is_updated(ctx, &c->doci, page, c->doci.search);
-      highlight_quads(ctx, page->cache.search.quads,
-                      page->cache.search.quads_count, pixmap, draw_page_ctm);
+      highlight_quads(ctx, &page->cache.search.quads, pixmap, draw_page_ctm);
     }
     // highlight selected link
     if (page->cache.highlighted_link) {
@@ -350,14 +350,14 @@ static void complete_selection(GtkWidget *widget, fz_point point) {
     int max_count = 256;
     int count;
     do {
-      page->cache.selection.quads =
-          realloc(page->cache.selection.quads, max_count * sizeof(fz_quad));
-      count = fz_highlight_selection(ctx, page->page_text,
-                                     page->selection_start, page->selection_end,
-                                     page->cache.selection.quads, max_count);
+      page->cache.selection.quads.quads = realloc(
+          page->cache.selection.quads.quads, max_count * sizeof(fz_quad));
+      count = fz_highlight_selection(
+          ctx, page->page_text, page->selection_start, page->selection_end,
+          page->cache.selection.quads.quads, max_count);
       max_count *= 2;
     } while (count == max_count);
-    page->cache.selection.quads_count = count;
+    page->cache.selection.quads.count = count;
   }
 }
 
@@ -751,7 +751,7 @@ void set_search(GtkWidget *widget, char *needle) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   if (strcmp(needle, c->doci.search)) {
     strcpy(c->doci.search, needle);
-    c->doci.search_update_time = clock();
+    c->doci.search_id++;
     gtk_widget_queue_draw(widget);
   }
 }
@@ -792,6 +792,8 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   doci->chapter_count = fz_count_chapters(ctx, doci->doc);
   // invalidate location keys on the page cache
   memset(doci->page_cache.locs, -1, sizeof(doci->page_cache.locs));
+  // make zeroed-out seach IDs invalid to current one
+  doci->search_id = 1;
   return 1;
 }
 

@@ -5,16 +5,19 @@
 #include <mupdf/pdf.h> /* for pdf specifics and forms */
 #include <time.h>
 
+typedef struct Quads {
+  fz_quad *quads; // allocated on demand by complete_selection()
+  int count;
+} Quads;
+
+typedef struct CachedQuads {
+  Quads quads;
+  long unsigned int id;
+} CachedQuads;
+
 typedef struct PageRenderCache {
-  struct Selection {
-    fz_quad *quads; // allocated on demand by complete_selection()
-    int quads_count;
-  } selection;
-  struct Search {
-    fz_quad *quads; // allocated on demand by complete_selection()
-    int quads_count;
-    clock_t update_time;
-  } search;
+  CachedQuads selection;
+  CachedQuads search;
   fz_link *highlighted_link;
 } PageRenderCache;
 
@@ -62,7 +65,7 @@ typedef struct DocInfo {
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   char search[PATH_MAX];
-  clock_t search_update_time;
+  long unsigned int search_id;
   fz_colorspace *colorspace;
   fz_context *ctx;
 } DocInfo;
@@ -76,11 +79,11 @@ typedef struct _PaperViewPrivate {
   GdkCursor *click_cursor;
 } PaperViewPrivate;
 
-typedef struct _PaperView {
+typedef struct PaperView {
   GtkDrawingArea parent_instance;
 } PaperView;
 
-typedef struct _PaperViewClass {
+typedef struct PaperViewClass {
   GtkDrawingAreaClass parent_class;
 } PaperViewClass;
 
