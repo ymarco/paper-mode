@@ -52,6 +52,9 @@ void load_page(DocInfo *doci, fz_location location, Page *page) {
     fprintf(stderr, "error loading page %d,%d: %s\n", location.chapter,
             location.page, fz_caught_message(ctx));
   }
+  PageRenderCache *cache = &page->cache;
+  cache->selection.id = 0;
+  cache->search.id = 0;
 }
 
 int prev_ind_in_page_cache(int i) {
