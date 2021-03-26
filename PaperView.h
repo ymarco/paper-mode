@@ -57,11 +57,13 @@ typedef struct DocInfo {
     fz_location locs[PAGE_CACHE_LEN];
     int first;
   } page_cache;
-  gboolean selecting;
-  gboolean selection_active;
-  fz_location selection_loc_start;
-  fz_location selection_loc_end;
-  int selection_mode; // FZ_SELECT_(CHARS|WORDS|LINES)
+  struct Selection {
+    gboolean is_in_progress;
+    gboolean is_active;
+    fz_location loc_start;
+    fz_location loc_end;
+    int mode; // FZ_SELECT_(CHARS|WORDS|LINES)
+  } selection;
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   char search[PATH_MAX];
