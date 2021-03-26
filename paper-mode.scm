@@ -16,10 +16,12 @@
  (version "0.0.1")
  (build-system emacs-build-system)
  (source (local-file "." "paper-mode"
-                     #:select? (git-predicate
-                                (dirname (assoc-ref
-                                          (current-source-location)
-                                          'filename)))
+                     ;; TODO this worked in a previous guix version
+                     ;; but now causes a segfault
+                     ;;#:select? (git-predicate
+                     ;;           (dirname (assoc-ref
+                     ;;                     (current-source-location)
+                     ;;                     'filename)))
                      #:recursive? #t))
  (inputs
   `(("mupdf" ,mupdf)
