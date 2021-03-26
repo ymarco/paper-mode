@@ -807,7 +807,7 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   }
   fz_location loc = {0, 0};
   doci->location = loc;
-  doci->colorspace = fz_device_rgb(ctx);
+  doci->colorspace = fz_device_bgr(ctx);
   doci->zoom = 1.0f;
   /* Count the number of pages. */
   doci->chapter_count = fz_count_chapters(ctx, doci->doc);
