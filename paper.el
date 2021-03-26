@@ -165,7 +165,7 @@
                                      :buffer (generate-new-buffer
                                               (format "* %s: pipe-process"
                                                       buffer-file-name))
-                                     :filter 'paper--filter
+                                     ;; :filter #'paper--filter
                                      :noquery t)
    paper--id (paper--new paper--process nil buffer-file-name nil))
   ;; don't waste rendering time below our frame with the raw PDF text

@@ -132,10 +132,10 @@ static emacs_value client_destroy(emacs_env *env, ptrdiff_t nargs,
 static void client_free(void *ptr) {
   debug_print("c %p client_free\n", ptr);
   Client *c = (Client *)ptr;
-  if (c->container != NULL) {
-    gtk_widget_destroy(c->container);
-    c->container = NULL;
-  };
+  /* if (c->container != NULL) { */
+  /*   gtk_widget_destroy(c->container); */
+  /*   c->container = NULL; */
+  /* }; */
   gtk_widget_destroy(GTK_WIDGET(c->view));
   g_object_unref(c->view);
   free(c);
