@@ -342,31 +342,35 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
 
 static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  struct Selection *selection = &c->doci.selection;
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
-    c->doci.selection.is_in_progress = TRUE;
+    selection->is_in_progress = TRUE;
     fz_point orig_point;
     trace_point_to_page(widget, &c->doci, fz_make_point(event->x, event->y),
-                        &orig_point, &c->doci.selection.loc_start);
-    c->doci.selection.loc_end = c->doci.selection.loc_start;
-    c->doci.selection.start = orig_point;
-    c->doci.selection.end = orig_point;
-    switch (event->type) {
-    case GDK_BUTTON_PRESS:
-      c->doci.selection.mode = FZ_SELECT_CHARS;
-      break;
-    case GDK_2BUTTON_PRESS:
-      c->doci.selection.mode = FZ_SELECT_WORDS;
-      c->doci.selection.id++;
+                        &orig_point, &selection->loc_start);
+    selection->loc_end = selection->loc_start;
+    selection->start = orig_point;
+    selection->end = orig_point;
+    if (event->type == GDK_BUTTON_PRESS) {
+      selection->mode = FZ_SELECT_CHARS;
+    } else if (event->type == GDK_2BUTTON_PRESS ||
+               event->type == GDK_3BUTTON_PRESS) {
+      switch (event->type) {
+      case GDK_2BUTTON_PRESS:
+        selection->mode = FZ_SELECT_WORDS;
+        break;
+      case GDK_3BUTTON_PRESS:
+        selection->mode = FZ_SELECT_LINES;
+        break;
+      default:
+        fprintf(stderr, "Unhandled button press type\n");
+      }
+      fz_snap_selection(c->doci.ctx,
+                        get_page(&c->doci, selection->loc_start)->page_text,
+                        &selection->start, &selection->end, selection->mode);
+      selection->id++;
       gtk_widget_queue_draw(widget);
-      break;
-    case GDK_3BUTTON_PRESS:
-      c->doci.selection.mode = FZ_SELECT_LINES;
-      c->doci.selection.id++;
-      gtk_widget_queue_draw(widget);
-      break;
-    default:
-      fprintf(stderr, "Unhandled button press type\n");
     }
     break;
   case GDK_BUTTON_MIDDLE:;
