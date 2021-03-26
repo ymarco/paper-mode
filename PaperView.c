@@ -15,16 +15,6 @@ int locationcmp(fz_location a, fz_location b) {
   return chapcmp != 0 ? chapcmp : a.page - b.page;
 }
 
-void ensure_chapter_is_loaded(DocInfo *doci, int chapter) {
-  fz_context *ctx = doci->ctx;
-  if (doci->pages[chapter])
-    return;
-  doci->page_count_for_chapter[chapter] =
-      fz_count_chapter_pages(ctx, doci->doc, chapter);
-  doci->pages[chapter] =
-      calloc(sizeof(Page), doci->page_count_for_chapter[chapter]);
-}
-
 void drop_page(fz_context *ctx, Page *page) {
   if (!page)
     return;
@@ -33,15 +23,13 @@ void drop_page(fz_context *ctx, Page *page) {
   fz_drop_separations(ctx, page->seps);
   fz_drop_link(ctx, page->links);
   fz_drop_display_list(ctx, page->display_list);
-  free(page->cache.selection_quads);
+  free(page->cache.selection.quads.quads);
+  free(page->cache.search.quads.quads);
 }
 
-void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
-  ensure_chapter_is_loaded(doci, location.chapter);
+void load_page(DocInfo *doci, fz_location location, Page *page) {
   fz_context *ctx = doci->ctx;
-  Page *page = &doci->pages[location.chapter][location.page];
-  if (page->page)
-    return;
+  memset(page, 0, sizeof(*page));
   fz_try(ctx) {
     page->page =
         fz_load_chapter_page(ctx, doci->doc, location.chapter, location.page);
@@ -66,10 +54,27 @@ void ensure_page_is_loaded(DocInfo *doci, fz_location location) {
   }
 }
 
-// TODO handle exceptions wherever get_page is used
+int prev_ind_in_page_cache(int i) {
+  return (i + PAGE_CACHE_LEN - 1) % PAGE_CACHE_LEN;
+}
+
+/*
+ * Return a pointer to a Page object at location LOC. The pointer might be
+ * invalidated as soon a new page is fetched via get_page (like strtok).
+ */
 Page *get_page(DocInfo *doci, fz_location loc) {
-  ensure_page_is_loaded(doci, loc);
-  return &doci->pages[loc.chapter][loc.page];
+  for (int i = 0; i < PAGE_CACHE_LEN; i++) {
+    if (locationcmp(loc, doci->page_cache.locs[i]) == 0) {
+      return &doci->page_cache.pages[i];
+    }
+  }
+  int new_first = prev_ind_in_page_cache(doci->page_cache.first);
+  Page *res = &doci->page_cache.pages[new_first];
+  drop_page(doci->ctx, res);
+  load_page(doci, loc, res);
+  doci->page_cache.locs[new_first] = loc;
+  doci->page_cache.first = new_first;
+  return res;
 }
 
 Page *get_cur_page(DocInfo *doci) { return get_page(doci, doci->location); }
@@ -118,15 +123,40 @@ static void center_page(int surface_width, DocInfo *doci) {
   doci->scroll.x = centered_page_start.x;
 }
 
-static void highlight_quads(fz_context *ctx, fz_quad *quads, int count,
-                            fz_pixmap *pixmap, fz_matrix ctm) {
-  for (int i = 0; i < count; i++) {
-    fz_quad box = fz_transform_quad(quads[i], ctm);
+static void highlight_quads(fz_context *ctx, Quads *quads, fz_pixmap *pixmap,
+                            fz_matrix ctm) {
+  for (int i = 0; i < quads->count; i++) {
+    fz_quad box = fz_transform_quad(quads->quads[i], ctm);
     fz_clear_pixmap_rect_with_value(
         ctx, pixmap, 0xE8,
         fz_round_rect(fz_make_rect(box.ul.x, box.ul.y, box.lr.x, box.lr.y)));
     // TODO actually fill in the quad instead of assuming its a rectangle
   }
+}
+
+void get_selection_bounds_for_page(fz_context *ctx, DocInfo *doci,
+                                   fz_location loc, fz_point *res_start,
+                                   fz_point *res_end) {
+  Page *page = get_page(doci, loc);
+  if (locationcmp(doci->selection.loc_start, loc) > 0 ||
+      locationcmp(doci->selection.loc_end, loc) < 0) { // out of bounds
+    page->cache.selection.quads.count = 0;
+    return;
+  }
+  if (locationcmp(doci->selection.loc_start, loc) < 0) {
+    res_start->x = page->page_bounds.x0;
+    res_start->y = page->page_bounds.y0;
+  } else { // loc == loc_start
+    *res_start = doci->selection.start;
+  }
+  if (locationcmp(loc, doci->selection.loc_end) != 0) {
+    res_end->x = page->page_bounds.x1;
+    res_end->y = page->page_bounds.y1;
+  } else { // loc == loc_start
+    *res_end = doci->selection.end;
+  }
+  fz_snap_selection(ctx, page->page_text, res_start, res_end,
+                    doci->selection.mode);
 }
 
 /*
@@ -137,19 +167,21 @@ static void highlight_quads(fz_context *ctx, fz_quad *quads, int count,
  */
 char *get_selection(GtkWidget *widget, size_t *res_len) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  if (!c->doci.selection_active)
+  if (!c->doci.selection.is_active)
     return NULL;
   char *res = NULL;
   // oh, what would I do to use open_memstream. Not standardized though.
   size_t len = 0;
   size_t size = 0;
-  for (fz_location loc = c->doci.selection_loc_start;
-       locationcmp(loc, c->doci.selection_loc_end) <= 0;
+  for (fz_location loc = c->doci.selection.loc_start;
+       locationcmp(loc, c->doci.selection.loc_end) <= 0;
        loc = fz_next_page(c->doci.ctx, c->doci.doc, loc)) {
     Page *page = get_page(&c->doci, loc);
-    char *page_sel =
-        fz_copy_selection(c->doci.ctx, page->page_text, page->selection_start,
-                          page->selection_end, 0);
+    fz_point sel_start, sel_end;
+    get_selection_bounds_for_page(c->doci.ctx, &c->doci, loc, &sel_start,
+                                  &sel_end);
+    char *page_sel = fz_copy_selection(c->doci.ctx, page->page_text, sel_start,
+                                       sel_start, 0);
     size_t n = strlen(page_sel);
     size_t new_len = n + len;
     if (new_len > size) {
@@ -168,21 +200,42 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
   return res;
 }
 
-void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
-                                    char *search) {
-  if (page->cache.search_update_time > doci->search_update_time)
+void ensure_selection_cache_is_updated(fz_context *ctx, DocInfo *doci,
+                                       fz_location loc) {
+  Page *page = get_page(doci, loc);
+  if (page->cache.selection.id == doci->selection.id)
     return;
+  fz_point sel_start, sel_end;
+  get_selection_bounds_for_page(ctx, doci, loc, &sel_start, &sel_end);
+  page->cache.selection.id = doci->selection.id;
   int max_count = 256;
   int count;
   do {
-    page->cache.search_quads =
-        realloc(page->cache.search_quads, max_count * sizeof(fz_quad));
-    count = fz_search_stext_page(ctx, page->page_text, search,
-                                 page->cache.search_quads, max_count);
+    page->cache.selection.quads.quads =
+        realloc(page->cache.selection.quads.quads, max_count * sizeof(fz_quad));
+    count =
+        fz_highlight_selection(ctx, page->page_text, sel_start, sel_end,
+                               page->cache.selection.quads.quads, max_count);
     max_count *= 2;
   } while (count == max_count);
-  page->cache.search_quads_count = count;
-  page->cache.search_update_time = clock();
+  page->cache.selection.quads.count = count;
+}
+
+void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
+                                    char *search) {
+  if (page->cache.search.id == doci->search_id)
+    return;
+  page->cache.search.id = doci->search_id;
+  int max_count = 256;
+  int count;
+  do {
+    page->cache.search.quads.quads =
+        realloc(page->cache.search.quads.quads, max_count * sizeof(fz_quad));
+    count = fz_search_stext_page(ctx, page->page_text, search,
+                                 page->cache.search.quads.quads, max_count);
+    max_count *= 2;
+  } while (count == max_count);
+  page->cache.search.quads.count = count;
 }
 
 static void allocate_pixmap(GtkWidget *widget, GdkRectangle *allocation) {
@@ -243,16 +296,15 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     fz_clear_pixmap_rect_with_value(ctx, pixmap, 0xFF,
                                     fz_round_rect(transformed_bounds));
     // highlight text selection
-    if ((c->doci.selection_active || c->doci.selecting) &&
-        locationcmp(loc, c->doci.selection_loc_end) <= 0) {
-      highlight_quads(ctx, page->cache.selection_quads,
-                      page->cache.selection_quads_count, pixmap, draw_page_ctm);
+    if ((c->doci.selection.is_active || c->doci.selection.is_in_progress) &&
+        locationcmp(loc, c->doci.selection.loc_end) <= 0) {
+      ensure_selection_cache_is_updated(ctx, &c->doci, loc);
+      highlight_quads(ctx, &page->cache.selection.quads, pixmap, draw_page_ctm);
     }
     // highlight search results
     if (c->doci.search[0]) {
       ensure_search_cache_is_updated(ctx, &c->doci, page, c->doci.search);
-      highlight_quads(ctx, page->cache.search_quads,
-                      page->cache.search_quads_count, pixmap, draw_page_ctm);
+      highlight_quads(ctx, &page->cache.search.quads, pixmap, draw_page_ctm);
     }
     // highlight selected link
     if (page->cache.highlighted_link) {
@@ -293,21 +345,20 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
-    c->doci.selecting = TRUE;
+    c->doci.selection.is_in_progress = TRUE;
     fz_point orig_point;
     trace_point_to_page(widget, &c->doci, fz_make_point(event->x, event->y),
-                        &orig_point, &c->doci.selection_loc_start);
-    Page *page = get_page(&c->doci, c->doci.selection_loc_start);
-    page->selection_start = orig_point;
+                        &orig_point, &c->doci.selection.loc_start);
+    c->doci.selection.start = orig_point;
     switch (event->type) {
     case GDK_BUTTON_PRESS:
-      c->doci.selection_mode = FZ_SELECT_CHARS;
+      c->doci.selection.mode = FZ_SELECT_CHARS;
       break;
     case GDK_2BUTTON_PRESS:
-      c->doci.selection_mode = FZ_SELECT_WORDS;
+      c->doci.selection.mode = FZ_SELECT_WORDS;
       break;
     case GDK_3BUTTON_PRESS:
-      c->doci.selection_mode = FZ_SELECT_LINES;
+      c->doci.selection.mode = FZ_SELECT_LINES;
       break;
     default:
       fprintf(stderr, "Unhandled button press type\n");
@@ -321,45 +372,6 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
     break;
   }
   return FALSE;
-}
-
-static void complete_selection(GtkWidget *widget, fz_point point) {
-  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  fz_context *ctx = c->doci.ctx;
-  fz_point end_point;
-  trace_point_to_page(widget, &c->doci, point, &end_point,
-                      &c->doci.selection_loc_end);
-  Page *sel_end_page = get_page(&c->doci, c->doci.selection_loc_end);
-  sel_end_page->selection_end = end_point;
-  Page *sel_start_page = get_page(&c->doci, c->doci.selection_loc_start);
-  // set all pages between loc_start and loc_and to full selection
-  for (fz_location loc = c->doci.selection_loc_start;
-       locationcmp(loc, c->doci.selection_loc_end) <= 0;
-       loc = fz_next_page(ctx, c->doci.doc, loc)) {
-    Page *page = get_page(&c->doci, loc);
-    if (page != sel_start_page) {
-      page->selection_start.x = page->page_bounds.x0;
-      page->selection_start.y = page->page_bounds.y0;
-    }
-    if (page != sel_end_page) {
-      page->selection_end.x = page->page_bounds.x1;
-      page->selection_end.y = page->page_bounds.y1;
-    }
-    fz_snap_selection(ctx, page->page_text, &page->selection_start,
-                      &page->selection_end, c->doci.selection_mode);
-
-    int max_count = 256;
-    int count;
-    do {
-      page->cache.selection_quads =
-          realloc(page->cache.selection_quads, max_count * sizeof(fz_quad));
-      count = fz_highlight_selection(ctx, page->page_text,
-                                     page->selection_start, page->selection_end,
-                                     page->cache.selection_quads, max_count);
-      max_count *= 2;
-    } while (count == max_count);
-    page->cache.selection_quads_count = count;
-  }
 }
 
 // TODO actually run this on realize
@@ -422,6 +434,7 @@ static gboolean query_tooltip(GtkWidget *widget, int x, int y,
     return FALSE;
 
   gchar text[PATH_MAX + 4]; // 4 for unicode link symbol
+  /* fprintf(stderr, "%s\n", link->uri); */
   if (fz_is_external_link(ctx, link->uri)) {
     snprintf(text, sizeof(text), "↪%s", link->uri);
   } else {
@@ -474,17 +487,17 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
   DocInfo *doci = &c->doci;
   switch (event->button) {
   case GDK_BUTTON_PRIMARY:
-    if (doci->selecting) {
-      doci->selecting = FALSE;
-      complete_selection(widget, fz_make_point(event->x, event->y));
-      gtk_widget_queue_draw(widget);
+    if (doci->selection.is_in_progress) {
+      doci->selection.is_in_progress = FALSE;
     }
-    if (memcmp(&get_page(doci, doci->selection_loc_start)->selection_start,
-               &get_page(doci, doci->selection_loc_end)->selection_end,
+    if (memcmp(&doci->selection.start, &doci->selection.end,
                sizeof(fz_point)) != 0) {
-      doci->selection_active = TRUE;
+      doci->selection.is_active = TRUE;
     } else {
-      doci->selection_active = FALSE;
+      if (doci->selection.is_active) {
+        doci->selection.is_active = FALSE;
+        gtk_widget_queue_draw(widget);
+      }
 
       fz_point mouse_point = {event->x, event->y};
       fz_point mouse_page_point;
@@ -503,8 +516,14 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
 }
 
 static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
-  if (event->state & GDK_BUTTON1_MASK) { // selecting
-    complete_selection(widget, fz_make_point(event->x, event->y));
+  if (event->state & GDK_BUTTON1_MASK) { // user is selecting
+    PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+    fz_point point = {event->x, event->y};
+    fz_point end_point;
+    trace_point_to_page(widget, &c->doci, point, &end_point,
+                        &c->doci.selection.loc_end);
+    c->doci.selection.end = end_point;
+    c->doci.selection.id++;
     gtk_widget_queue_draw(widget);
   } else {
     if (update_highlighted_link(widget, fz_make_point(event->x, event->y))) {
@@ -738,8 +757,8 @@ void fit_height(GtkWidget *widget) {
 
 void unset_selection(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  c->doci.selection_active = 0;
-  c->doci.selecting = 0;
+  c->doci.selection.is_active = 0;
+  c->doci.selection.is_in_progress = 0;
   gtk_widget_queue_draw(widget);
 }
 
@@ -753,7 +772,7 @@ void set_search(GtkWidget *widget, char *needle) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   if (strcmp(needle, c->doci.search)) {
     strcpy(c->doci.search, needle);
-    c->doci.search_update_time = clock();
+    c->doci.search_id++;
     gtk_widget_queue_draw(widget);
   }
 }
@@ -792,16 +811,11 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   doci->zoom = 1.0f;
   /* Count the number of pages. */
   doci->chapter_count = fz_count_chapters(ctx, doci->doc);
-  if (!(doci->pages = calloc(sizeof(Page *), doci->chapter_count))) {
-    fz_drop_context(ctx);
-    return 0;
-  }
-  if (!(doci->page_count_for_chapter =
-            calloc(sizeof(int *), doci->chapter_count))) {
-    fz_drop_context(ctx);
-    free(doci->pages);
-    return 0;
-  }
+  // invalidate location keys on the page cache
+  memset(doci->page_cache.locs, -1, sizeof(doci->page_cache.locs));
+  // make zeroed-out seach IDs invalid to current one
+  doci->search_id = 1;
+  doci->selection.id = 1;
   return 1;
 }
 
@@ -838,21 +852,13 @@ static void paper_view_finalize(GObject *object) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(object));
   fz_context *ctx = c->doci.ctx;
   cairo_surface_destroy(c->image_surf);
-  Page *chapter_pages;
-  for (int chapter = 0; chapter < c->doci.chapter_count; chapter++) {
-    chapter_pages = c->doci.pages[chapter];
-    if (chapter_pages) {
-      for (int page = 0; page < c->doci.page_count_for_chapter[chapter]; page++)
-        drop_page(ctx, &chapter_pages[page]);
-      free(chapter_pages);
-    }
+  for (int i = 0; i < PAGE_CACHE_LEN; i++) {
+    drop_page(ctx, &c->doci.page_cache.pages[i]);
   }
   fz_drop_document(ctx, c->doci.doc);
   fz_drop_outline(ctx, c->doci.outline);
   pdf_drop_document(ctx, c->doci.pdf);
   pdf_drop_annot(ctx, c->doci.selected_annot);
-  free(c->doci.pages);
-  free(c->doci.page_count_for_chapter);
   fz_drop_context(c->doci.ctx);
   G_OBJECT_CLASS(paper_view_parent_class)->finalize(object);
 }

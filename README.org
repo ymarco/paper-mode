@@ -33,8 +33,9 @@ With [[https://github.com/jwiegley/use-package/][use-package]]:
       + [X] Highlight on hover
       + [X] Show destination in a mousce hover popup kinda thing
       + [X] Follow internal links on click
-  + [ ] Lazy load page text
-  + [ ] Pre render next pages and free previous pages
+  + [X] CANCELED Lazy load page text
+  + [X] Free previous pages
+  + [ ] Pre render next pages
   + [ ] Synctex
 - [-] Inside Emacs
   + [ ] Sensible page dimensions by default:
@@ -42,8 +43,8 @@ With [[https://github.com/jwiegley/use-package/][use-package]]:
     sensible, calculate minimum width with ~fz_new_bbox_device~ if too small.
   + [-] Evil controls. I can't do Emacs-style keybinds myself.
   + [ ] Follow links external to the document
-  + [ ] Search
-    - [ ] Normal
+  + [-] Search
+    - [-] Normal
     - [ ] With a swiper-like preview of the results
   + [ ] Imenu to show PDF outline/bookmarks
   + [ ] Change bg & fg colors to comply with the Emacs theme, pdf-midnight-mode

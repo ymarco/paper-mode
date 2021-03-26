@@ -5,13 +5,19 @@
 #include <mupdf/pdf.h> /* for pdf specifics and forms */
 #include <time.h>
 
-typedef struct PageRenderCache {
-  fz_quad *selection_quads; // allocated on demand by complete_selection()
-  int selection_quads_count;
-  fz_quad *search_quads; // allocated on demand by complete_selection()
-  int search_quads_count;
-  clock_t search_update_time;
+typedef struct Quads {
+  fz_quad *quads; // allocated on demand by complete_selection()
+  int count;
+} Quads;
 
+typedef struct CachedQuads {
+  Quads quads;
+  long unsigned int id;
+} CachedQuads;
+
+typedef struct PageRenderCache {
+  CachedQuads selection;
+  CachedQuads search;
   fz_link *highlighted_link;
 } PageRenderCache;
 
@@ -22,12 +28,12 @@ typedef struct Page {
   fz_separations *seps;
   fz_link *links;
   fz_display_list *display_list;
-  fz_point selection_start;
-  fz_point selection_end;
   PageRenderCache cache;
 } Page;
 
 extern const int PAGE_SEPARATOR_HEIGHT;
+
+#define PAGE_CACHE_LEN 32
 
 typedef struct DocInfo {
   fz_document *doc;
@@ -37,23 +43,32 @@ typedef struct DocInfo {
   pdf_annot *selected_annot;
   float zoom;   // 1.0 means no scaling
   float rotate; // in degrees
-  /* pages[location.chapter][location.page] = page */
-  Page **pages;
   /* 0 <= scroll.y <= get_page(doci, doci.location).page_bounds.y1 +
    * PAGE_SEPARATOR_HEIGHT*/
   /* scroll is always relative to current page bounds */
   fz_point scroll;
   int chapter_count;
-  int *page_count_for_chapter;
-  gboolean selecting;
-  gboolean selection_active;
-  fz_location selection_loc_start;
-  fz_location selection_loc_end;
-  int selection_mode; // FZ_SELECT_(CHARS|WORDS|LINES)
+  // cache of pages implemented as a circular array with newly fetched pages at
+  // the front
+  struct PageCache {
+    Page pages[PAGE_CACHE_LEN];
+    fz_location locs[PAGE_CACHE_LEN];
+    int first;
+  } page_cache;
+  struct Selection {
+    gboolean is_in_progress;
+    gboolean is_active;
+    fz_point start;
+    fz_point end;
+    fz_location loc_start;
+    fz_location loc_end;
+    int mode; // FZ_SELECT_(CHARS|WORDS|LINES)
+    long unsigned int id;
+  } selection;
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   char search[PATH_MAX];
-  clock_t search_update_time;
+  long unsigned int search_id;
   fz_colorspace *colorspace;
   fz_context *ctx;
 } DocInfo;
@@ -67,11 +82,11 @@ typedef struct _PaperViewPrivate {
   GdkCursor *click_cursor;
 } PaperViewPrivate;
 
-typedef struct _PaperView {
+typedef struct PaperView {
   GtkDrawingArea parent_instance;
 } PaperView;
 
-typedef struct _PaperViewClass {
+typedef struct PaperViewClass {
   GtkDrawingAreaClass parent_class;
 } PaperViewClass;
 
