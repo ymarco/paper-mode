@@ -28,8 +28,6 @@ typedef struct Page {
   fz_separations *seps;
   fz_link *links;
   fz_display_list *display_list;
-  fz_point selection_start;
-  fz_point selection_end;
   PageRenderCache cache;
 } Page;
 
@@ -60,9 +58,12 @@ typedef struct DocInfo {
   struct Selection {
     gboolean is_in_progress;
     gboolean is_active;
+    fz_point start;
+    fz_point end;
     fz_location loc_start;
     fz_location loc_end;
     int mode; // FZ_SELECT_(CHARS|WORDS|LINES)
+    long unsigned int id;
   } selection;
   char filename[PATH_MAX];
   char accel[PATH_MAX];

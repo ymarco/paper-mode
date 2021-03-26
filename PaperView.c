@@ -58,6 +58,10 @@ int prev_ind_in_page_cache(int i) {
   return (i + PAGE_CACHE_LEN - 1) % PAGE_CACHE_LEN;
 }
 
+/*
+ * Return a pointer to a Page object at location LOC. The pointer might be
+ * invalidated as soon a new page is fetched via get_page (like strtok).
+ */
 Page *get_page(DocInfo *doci, fz_location loc) {
   for (int i = 0; i < PAGE_CACHE_LEN; i++) {
     if (locationcmp(loc, doci->page_cache.locs[i]) == 0) {
@@ -130,6 +134,31 @@ static void highlight_quads(fz_context *ctx, Quads *quads, fz_pixmap *pixmap,
   }
 }
 
+void get_selection_bounds_for_page(fz_context *ctx, DocInfo *doci,
+                                   fz_location loc, fz_point *res_start,
+                                   fz_point *res_end) {
+  Page *page = get_page(doci, loc);
+  if (locationcmp(doci->selection.loc_start, loc) > 0 ||
+      locationcmp(doci->selection.loc_end, loc) < 0) { // out of bounds
+    page->cache.selection.quads.count = 0;
+    return;
+  }
+  if (locationcmp(doci->selection.loc_start, loc) < 0) {
+    res_start->x = page->page_bounds.x0;
+    res_start->y = page->page_bounds.y0;
+  } else { // loc == loc_start
+    *res_start = doci->selection.start;
+  }
+  if (locationcmp(loc, doci->selection.loc_end) != 0) {
+    res_end->x = page->page_bounds.x1;
+    res_end->y = page->page_bounds.y1;
+  } else { // loc == loc_start
+    *res_end = doci->selection.end;
+  }
+  fz_snap_selection(ctx, page->page_text, res_start, res_end,
+                    doci->selection.mode);
+}
+
 /*
  * Return a string of the text selection spanning on all the pages with
  * selection. It's your responsibility to free the returned pointer. *res_len is
@@ -148,9 +177,11 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
        locationcmp(loc, c->doci.selection.loc_end) <= 0;
        loc = fz_next_page(c->doci.ctx, c->doci.doc, loc)) {
     Page *page = get_page(&c->doci, loc);
-    char *page_sel =
-        fz_copy_selection(c->doci.ctx, page->page_text, page->selection_start,
-                          page->selection_end, 0);
+    fz_point sel_start, sel_end;
+    get_selection_bounds_for_page(c->doci.ctx, &c->doci, loc, &sel_start,
+                                  &sel_end);
+    char *page_sel = fz_copy_selection(c->doci.ctx, page->page_text, sel_start,
+                                       sel_start, 0);
     size_t n = strlen(page_sel);
     size_t new_len = n + len;
     if (new_len > size) {
@@ -167,6 +198,27 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
     res[len] = '\0';
   *res_len = len;
   return res;
+}
+
+void ensure_selection_cache_is_updated(fz_context *ctx, DocInfo *doci,
+                                       fz_location loc) {
+  Page *page = get_page(doci, loc);
+  if (page->cache.selection.id == doci->selection.id)
+    return;
+  fz_point sel_start, sel_end;
+  get_selection_bounds_for_page(ctx, doci, loc, &sel_start, &sel_end);
+  page->cache.selection.id = doci->selection.id;
+  int max_count = 256;
+  int count;
+  do {
+    page->cache.selection.quads.quads =
+        realloc(page->cache.selection.quads.quads, max_count * sizeof(fz_quad));
+    count =
+        fz_highlight_selection(ctx, page->page_text, sel_start, sel_end,
+                               page->cache.selection.quads.quads, max_count);
+    max_count *= 2;
+  } while (count == max_count);
+  page->cache.selection.quads.count = count;
 }
 
 void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
@@ -246,6 +298,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     // highlight text selection
     if ((c->doci.selection.is_active || c->doci.selection.is_in_progress) &&
         locationcmp(loc, c->doci.selection.loc_end) <= 0) {
+      ensure_selection_cache_is_updated(ctx, &c->doci, loc);
       highlight_quads(ctx, &page->cache.selection.quads, pixmap, draw_page_ctm);
     }
     // highlight search results
@@ -296,8 +349,7 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
     fz_point orig_point;
     trace_point_to_page(widget, &c->doci, fz_make_point(event->x, event->y),
                         &orig_point, &c->doci.selection.loc_start);
-    Page *page = get_page(&c->doci, c->doci.selection.loc_start);
-    page->selection_start = orig_point;
+    c->doci.selection.start = orig_point;
     switch (event->type) {
     case GDK_BUTTON_PRESS:
       c->doci.selection.mode = FZ_SELECT_CHARS;
@@ -320,44 +372,6 @@ static gboolean button_press_event(GtkWidget *widget, GdkEventButton *event) {
     break;
   }
   return FALSE;
-}
-
-static void complete_selection(GtkWidget *widget, fz_point point) {
-  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  fz_context *ctx = c->doci.ctx;
-  fz_point end_point;
-  trace_point_to_page(widget, &c->doci, point, &end_point,
-                      &c->doci.selection.loc_end);
-  Page *sel_end_page = get_page(&c->doci, c->doci.selection.loc_end);
-  sel_end_page->selection_end = end_point;
-  // set all pages between loc_start and loc_and to full selection
-  for (fz_location loc = c->doci.selection.loc_start;
-       locationcmp(loc, c->doci.selection.loc_end) <= 0;
-       loc = fz_next_page(ctx, c->doci.doc, loc)) {
-    Page *page = get_page(&c->doci, loc);
-    if (page != sel_start_page) {
-      page->selection_start.x = page->page_bounds.x0;
-      page->selection_start.y = page->page_bounds.y0;
-    }
-    if (page != sel_end_page) {
-      page->selection_end.x = page->page_bounds.x1;
-      page->selection_end.y = page->page_bounds.y1;
-    }
-    fz_snap_selection(ctx, page->page_text, &page->selection_start,
-                      &page->selection_end, c->doci.selection.mode);
-
-    int max_count = 256;
-    int count;
-    do {
-      page->cache.selection.quads.quads = realloc(
-          page->cache.selection.quads.quads, max_count * sizeof(fz_quad));
-      count = fz_highlight_selection(
-          ctx, page->page_text, page->selection_start, page->selection_end,
-          page->cache.selection.quads.quads, max_count);
-      max_count *= 2;
-    } while (count == max_count);
-    page->cache.selection.quads.count = count;
-  }
 }
 
 // TODO actually run this on realize
@@ -420,6 +434,7 @@ static gboolean query_tooltip(GtkWidget *widget, int x, int y,
     return FALSE;
 
   gchar text[PATH_MAX + 4]; // 4 for unicode link symbol
+  /* fprintf(stderr, "%s\n", link->uri); */
   if (fz_is_external_link(ctx, link->uri)) {
     snprintf(text, sizeof(text), "↪%s", link->uri);
   } else {
@@ -474,15 +489,15 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
   case GDK_BUTTON_PRIMARY:
     if (doci->selection.is_in_progress) {
       doci->selection.is_in_progress = FALSE;
-      complete_selection(widget, fz_make_point(event->x, event->y));
-      gtk_widget_queue_draw(widget);
     }
-    if (memcmp(&get_page(doci, doci->selection.loc_start)->selection_start,
-               &get_page(doci, doci->selection.loc_end)->selection_end,
+    if (memcmp(&doci->selection.start, &doci->selection.end,
                sizeof(fz_point)) != 0) {
       doci->selection.is_active = TRUE;
     } else {
-      doci->selection.is_active = FALSE;
+      if (doci->selection.is_active) {
+        doci->selection.is_active = FALSE;
+        gtk_widget_queue_draw(widget);
+      }
 
       fz_point mouse_point = {event->x, event->y};
       fz_point mouse_page_point;
@@ -502,7 +517,13 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
 
 static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
   if (event->state & GDK_BUTTON1_MASK) { // user is selecting
-    complete_selection(widget, fz_make_point(event->x, event->y));
+    PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+    fz_point point = {event->x, event->y};
+    fz_point end_point;
+    trace_point_to_page(widget, &c->doci, point, &end_point,
+                        &c->doci.selection.loc_end);
+    c->doci.selection.end = end_point;
+    c->doci.selection.id++;
     gtk_widget_queue_draw(widget);
   } else {
     if (update_highlighted_link(widget, fz_make_point(event->x, event->y))) {
@@ -793,6 +814,7 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   memset(doci->page_cache.locs, -1, sizeof(doci->page_cache.locs));
   // make zeroed-out seach IDs invalid to current one
   doci->search_id = 1;
+  doci->selection.id = 1;
   return 1;
 }
 
