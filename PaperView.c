@@ -323,9 +323,9 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     if (page->cache.highlighted_link) {
       double light_gray = 0.92;
       cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1 - light_gray);
-      fz_rect box = page->cache.highlighted_link->rect;
-      cairo_rectangle(cr, stopped.x + box.x0, stopped.y + box.y0,
-                      box.x1 - box.x0, box.y1 - box.y0);
+      fz_rect box =
+          fz_transform_rect(page->cache.highlighted_link->rect, draw_page_ctm);
+      cairo_rectangle(cr, box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
       cairo_fill(cr);
     }
 
