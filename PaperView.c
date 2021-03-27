@@ -188,8 +188,8 @@ char *get_selection(GtkWidget *widget, size_t *res_len) {
     fz_point sel_start, sel_end;
     get_selection_bounds_for_page(c->doci.ctx, &c->doci, loc, &sel_start,
                                   &sel_end);
-    char *page_sel = fz_copy_selection(c->doci.ctx, page->page_text, sel_start,
-                                       sel_end, 0);
+    char *page_sel =
+        fz_copy_selection(c->doci.ctx, page->page_text, sel_start, sel_end, 0);
     size_t n = strlen(page_sel);
     size_t new_len = n + len;
     if (new_len > size) {
@@ -516,7 +516,9 @@ static gboolean button_release_event(GtkWidget *widget, GdkEventButton *event) {
       Page *page = get_page(&c->doci, mouse_page_loc);
       fz_link *link = page->cache.highlighted_link;
       if (link != NULL) {
+        // clicked link
         follow_link(widget, link);
+        gtk_widget_queue_draw(widget);
       }
     }
     break;
@@ -534,10 +536,10 @@ static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event) {
     c->doci.selection.end = end_point;
     c->doci.selection.id++;
     gtk_widget_queue_draw(widget);
-  } else {
-    if (update_highlighted_link(widget, fz_make_point(event->x, event->y))) {
-      gtk_widget_queue_draw(widget);
-    }
+  } else if (update_highlighted_link(widget,
+                                     fz_make_point(event->x, event->y))) {
+    // hovering over link
+    gtk_widget_queue_draw(widget);
   }
   return FALSE;
 }
@@ -756,6 +758,8 @@ void fit_width(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.x = 0;
   c->doci.zoom = ((float)w / get_cur_page(&c->doci)->page_bounds.x1);
+  c->doci.rendered_id++;
+  gtk_widget_queue_draw(widget);
 }
 
 void fit_height(GtkWidget *widget) {
@@ -763,6 +767,8 @@ void fit_height(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.y = 0;
   c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1);
+  c->doci.rendered_id++;
+  gtk_widget_queue_draw(widget);
 }
 
 void unset_selection(GtkWidget *widget) {

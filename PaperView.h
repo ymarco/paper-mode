@@ -12,6 +12,8 @@ typedef struct Quads {
 
 typedef struct CachedQuads {
   Quads quads;
+  // global DocInfo IDs and local ones are compared to check if the cache is
+  // valid; DocInfo IDs change each time to invalidate all cached results.
   long unsigned int id;
 } CachedQuads;
 
