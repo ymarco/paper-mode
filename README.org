@@ -10,6 +10,7 @@ It should work with Emacs 27.
 1. Clone the repo
 2. Run ~make~
 3. Add repo dir to load path
+Alternatively, install through [[http://guix.gnu.org][Guix]] with ~guix package -f paper-mode.scm~
 ** Config
 With [[https://github.com/jwiegley/use-package/][use-package]]:
 #+begin_src emacs-lisp
