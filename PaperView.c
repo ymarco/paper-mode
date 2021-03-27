@@ -321,10 +321,12 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
     }
     // highlight selected link
     if (page->cache.highlighted_link) {
-      double light_gray = 0.909;
-      cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, light_gray);
+      double light_gray = 0.92;
+      cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1 - light_gray);
       fz_rect box = page->cache.highlighted_link->rect;
-      cairo_rectangle(cr, box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
+      cairo_rectangle(cr, stopped.x + box.x0, stopped.y + box.y0,
+                      box.x1 - box.x0, box.y1 - box.y0);
+      cairo_fill(cr);
     }
 
     stopped.y += cairo_image_surface_get_height(drawn_page);
