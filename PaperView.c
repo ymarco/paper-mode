@@ -767,6 +767,7 @@ void fit_height(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.y = 0;
   c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1);
+  center(widget);
   c->doci.rendered_id++;
   gtk_widget_queue_draw(widget);
 }
