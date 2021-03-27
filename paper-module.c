@@ -153,6 +153,18 @@ emacs_value Fpaper_zoom(emacs_env *env, ptrdiff_t nargs, emacs_value args[],
   return Qnil;
 }
 
+emacs_value Fpaper_zoom_around_point(emacs_env *env, ptrdiff_t nargs,
+                                     emacs_value args[], void *data) {
+  UNUSED(nargs);
+  UNUSED(data);
+  Client *c = env->get_user_ptr(env, args[0]);
+  double m = env->extract_float(env, args[1]);
+  double x = env->extract_float(env, args[2]);
+  double y = env->extract_float(env, args[3]);
+  zoom_relatively_around_point(c->view, m, fz_make_point(x, y));
+  return Qnil;
+}
+
 #define BIND_WIDGET(new_name, Fname)                                           \
   emacs_value new_name(emacs_env *env, ptrdiff_t nargs, emacs_value args[],    \
                        void *data) {                                           \
@@ -243,6 +255,8 @@ int emacs_module_init(struct emacs_runtime *ert) {
   mkfn(env, 1, 1, Fpaper_unset_selection, "paper--unset-selection", "");
   mkfn(env, 1, 1, Fpaper_unset_search, "paper--unset-search", "");
   mkfn(env, 2, 2, Fpaper_set_search, "paper--set-search", "");
+  mkfn(env, 4, 4, Fpaper_zoom_around_point, "paper--zoom-around-point",
+       "\\fn(id mult x y)");
 
   // done
   provide(env, "paper-module");

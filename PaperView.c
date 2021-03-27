@@ -617,6 +617,12 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   scroll_pages(doci);
 }
 
+void zoom_relatively_around_point(GtkWidget *widget, float mult,
+                                  fz_point point) {
+  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  zoom_around_point(widget, &c->doci, c->doci.zoom * mult, point);
+}
+
 /*
  * Scroll relative to widget width/height.
  * Having mult.y = 0.1 means scroll down 10% of the widget height.
