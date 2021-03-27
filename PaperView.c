@@ -582,8 +582,14 @@ static void scroll(DocInfo *doci, fz_point delta) {
   scroll_pages(doci);
 }
 
+static void change_zoom(DocInfo *doci, float new_zoom) {
+  if (doci->zoom == new_zoom)
+    return;
+  doci->zoom = new_zoom;
+  doci->rendered_id++;
+}
 /*
- * Increase zoom by ZOOM_MULTIPLIER and set scroll.x, scroll.y so that POINT (a
+ * Change zoom to NEW_ZOOM and set scroll.x, scroll.y so that POINT (a
  * point in the bounds of WIDGET) stays on the same pixel as it did before
  * adjusting the zoom.
  */
@@ -599,7 +605,7 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
     original_point_in_page.y +=
         get_page(doci, loc)->page_bounds.y1 + PAGE_SEPARATOR_HEIGHT;
   }
-  doci->zoom = new_zoom;
+  change_zoom(doci, new_zoom);
   fz_matrix new_scale_ctm = get_scale_ctm(doci, get_page(doci, original_loc));
   fz_matrix new_scale_ctm_inv = fz_invert_matrix(new_scale_ctm);
   fz_point new_point =
@@ -609,7 +615,6 @@ static void zoom_around_point(GtkWidget *widget, DocInfo *doci, float new_zoom,
   fz_point unscaled_diff = fz_transform_point(scaled_diff, new_scale_ctm_inv);
   doci->scroll = unscaled_diff;
   scroll_pages(doci);
-  doci->rendered_id++;
 }
 
 /*
@@ -757,8 +762,7 @@ void fit_width(GtkWidget *widget) {
   int w = gtk_widget_get_allocated_width(widget);
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.x = 0;
-  c->doci.zoom = ((float)w / get_cur_page(&c->doci)->page_bounds.x1);
-  c->doci.rendered_id++;
+  change_zoom(&c->doci, (float)w / get_cur_page(&c->doci)->page_bounds.x1);
   gtk_widget_queue_draw(widget);
 }
 
@@ -766,9 +770,8 @@ void fit_height(GtkWidget *widget) {
   int h = gtk_widget_get_allocated_height(widget);
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
   c->doci.scroll.y = 0;
-  c->doci.zoom = ((float)h / get_cur_page(&c->doci)->page_bounds.y1);
+  change_zoom(&c->doci, (float)h / get_cur_page(&c->doci)->page_bounds.y1);
   center(widget);
-  c->doci.rendered_id++;
   gtk_widget_queue_draw(widget);
 }
 
