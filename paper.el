@@ -136,6 +136,49 @@
   (paper--unset-selection paper--id)
   (paper--unset-search paper--id))
 
+(defun paper-mwheel-scroll (button scroll-window)
+  "Scroll up or down in SCROLL-WINDOW according to the BUTTON.
+
+Similar to `mwheel-scroll' but for paper-mode."
+  (interactive (list (mwheel-event-button last-input-event)
+                     (mouse-wheel--get-scroll-window last-input-event)))
+  (let ((original-window (selected-window)))
+    (select-window scroll-window)
+    (unwind-protect
+        (paper--scroll paper--id
+                       0.0      ; x
+                       ;; emacs seems to miss some of the scroll events
+                       ;; so zoom by a little more than the default 0.1
+                       (cond
+                        ((eq button mouse-wheel-down-event) -0.2)
+                        ((eq button mouse-wheel-up-event) 0.2)
+                        (t 0)))
+      (select-window original-window))))
+
+(defun paper-mouse-wheel-text-scale (e)
+  "Increase or decrease zoom level in SCROLL-WINDOW according to the BUTTON.
+
+Similar to `mouse-wheel-text-scale' but for paper-mode."
+  (interactive "e")
+  (let* ((original-window (selected-window))
+         (scroll-posn (event-start e))
+         (scroll-window (posn-window scroll-posn))
+         (scroll-x-y (posn-x-y scroll-posn))
+         (scroll-x (float (car scroll-x-y)))
+         (scroll-y (float (cdr scroll-x-y)))
+         (button (mwheel-event-button last-input-event)))
+    (select-window scroll-window)
+    (unwind-protect
+        ;; emacs seems to miss some of the scroll events
+        ;; so zoom by a little more than the default 1.1
+        (paper--zoom-around-point paper--id
+                                  (cond
+                                   ((eq button mouse-wheel-down-event) 1.2)
+                                   ((eq button mouse-wheel-up-event) (/ 1 1.2))
+                                   (t 1.0))
+                                  scroll-x scroll-y)
+      (select-window original-window))))
+
 (defvar paper-mode-map
   (let ((map (make-sparse-keymap)))
     ;; TODO have someone who uses vanilla-style bindings do it
@@ -147,6 +190,8 @@
     (define-key map [remap previous-line] #'paper-scroll-up)
     (define-key map [remap scroll-up-command] #'paper-scroll-window-up)
     (define-key map [remap scroll-down-command] #'paper-scroll-window-up)
+    (define-key map [remap mwheel-scroll] #'paper-mwheel-scroll)
+    (define-key map [remap mouse-wheel-text-scale] #'paper-mouse-wheel-text-scale)
     map)
   "Keymap for `paper-mode'.")
 

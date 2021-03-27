@@ -641,55 +641,7 @@ void scroll_relatively(GtkWidget *widget, fz_point mult) {
   fz_point scrolled =
       fz_transform_point(fz_make_point(mult.x * w, mult.y * h), scale_ctm_inv);
   scroll(&c->doci, scrolled);
-}
-
-static gboolean scroll_event(GtkWidget *widget, GdkEventScroll *event) {
-  PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  if (event->type != GDK_SCROLL) {
-    return TRUE;
-  }
-  if (event->state & GDK_CONTROL_MASK) { // zoom
-    float multiplier = 1;
-    switch (event->direction) {
-    case GDK_SCROLL_UP:
-      multiplier = 1.1;
-      break;
-    case GDK_SCROLL_DOWN:
-      multiplier = 1 / 1.1;
-      break;
-    default:
-      fprintf(stderr, "unhandled zoom scroll case\n");
-    }
-    zoom_around_point(widget, &c->doci, c->doci.zoom * multiplier,
-                      fz_make_point(event->x, event->y));
-  } else { // scroll
-    // scroll 10% of window dimentions
-    float multiplier = 0.10;
-    fz_point d = {0, 0};
-    switch (event->direction) {
-    case GDK_SCROLL_UP:
-      d.y = -multiplier;
-      break;
-    case GDK_SCROLL_DOWN:
-      d.y = multiplier;
-      break;
-    case GDK_SCROLL_LEFT:
-      d.x = -multiplier;
-      break;
-    case GDK_SCROLL_RIGHT:
-      d.x = multiplier;
-      break;
-    case GDK_SCROLL_SMOOTH:
-      d.x = event->delta_x;
-      d.y = event->delta_y;
-      fprintf(stderr, "Smooth scroll\n");
-      break;
-    }
-    scroll_relatively(widget, d);
-  }
-  update_highlighted_link(widget, fz_make_point(event->x, event->y));
-  gtk_widget_queue_draw(widget);
-  return FALSE;
+  // TODO update_highlighted_link: how do we get mouse coordinates?
 }
 
 void scroll_to_page_start(GtkWidget *widget) {
@@ -898,7 +850,6 @@ static void paper_view_class_init(PaperViewClass *class) {
   widget_class->button_press_event = button_press_event;
   widget_class->motion_notify_event = motion_notify_event;
   widget_class->button_release_event = button_release_event;
-  widget_class->scroll_event = scroll_event;
   widget_class->configure_event = configure_event;
   widget_class->query_tooltip = query_tooltip;
   /* widget_class->leave_notify_event   = cb_zathura_page_widget_leave_notify;
@@ -915,12 +866,11 @@ static void paper_view_init(PaperView *self) {
   // TODO when I also add GDK_SMOOTH_SCROLL_MASK all scroll events turn to
   // smooth ones with deltas of 0, I don't know how to find the direction in
   // those cases
-  gtk_widget_add_events(GTK_WIDGET(self),
-                        GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
-                            GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
-                            GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
-                            GDK_POINTER_MOTION_MASK |
-                            GDK_POINTER_MOTION_HINT_MASK | GDK_SCROLL_MASK);
+  gtk_widget_add_events(
+      GTK_WIDGET(self),
+      GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK | GDK_BUTTON_PRESS_MASK |
+          GDK_BUTTON_RELEASE_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK |
+          GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK);
   gtk_widget_set_has_tooltip(GTK_WIDGET(self), TRUE);
 }
 
