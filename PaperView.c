@@ -273,6 +273,7 @@ void render_page(fz_context *ctx, DocInfo *doci, Page *page) {
   fz_close_device(ctx, draw_device);
   fz_drop_device(ctx, draw_device);
   fz_drop_pixmap(ctx, pixmap);
+  cairo_surface_mark_dirty(page->cache.rendered.surface);
 }
 
 cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci, Page *page) {
@@ -737,24 +738,31 @@ void fit_height(GtkWidget *widget) {
 
 void unset_selection(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  c->doci.selection.is_active = 0;
-  c->doci.selection.is_in_progress = 0;
+  struct Selection *selection = &c->doci.selection;
+  if (!selection->is_active && !selection->is_in_progress)
+    return;
+  selection->is_active = 0;
+  selection->is_in_progress = 0;
+  selection->id++;
   gtk_widget_queue_draw(widget);
 }
 
 void unset_search(GtkWidget *widget) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
+  if (c->doci.search[0] == '\0')
+    return;
   c->doci.search[0] = '\0';
+  c->doci.search_id++;
   gtk_widget_queue_draw(widget);
 }
 
 void set_search(GtkWidget *widget, char *needle) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(widget));
-  if (strcmp(needle, c->doci.search)) {
-    strcpy(c->doci.search, needle);
-    c->doci.search_id++;
-    gtk_widget_queue_draw(widget);
-  }
+  if (strcmp(needle, c->doci.search) == 0)
+    return;
+  strcpy(c->doci.search, needle);
+  c->doci.search_id++;
+  gtk_widget_queue_draw(widget);
 }
 
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
