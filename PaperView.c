@@ -293,8 +293,8 @@ void thread_render(gpointer data, gpointer user_data);
 
 // if page is not available yet, returns NULL gtk_widget_queue_draw would later
 // be called from another thread to update the rendering.
-cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
-                                   Page *page) {
+cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
+                                    Page *page) {
   if (page->cache.rendered.id != doci->rendered_id) {
     page->cache.rendered.id = doci->rendered_id;
     struct RenderArgs *ra = malloc(sizeof(*ra));
@@ -308,6 +308,18 @@ cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
   if (page->cache.rendered.is_in_progress)
     return NULL;
   return page->cache.rendered.surface;
+}
+// a wrapper for get_rendered_page_ that puts close pages in cache
+cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
+                                   Page *page) {
+  fz_location loc = {page->page->chapter, page->page->number};
+
+  Page *next = get_page(doci, fz_next_page(doci->ctx, doci->doc, loc));
+  get_rendered_page_(doci, widget, next);
+  Page *prev = get_page(doci, fz_previous_page(doci->ctx, doci->doc, loc));
+  get_rendered_page_(doci, widget, prev);
+
+  return get_rendered_page_(doci, widget, page);
 }
 
 // a function with a valid signature for gdk_threads_add_idle

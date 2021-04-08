@@ -39,7 +39,7 @@ With [[https://github.com/jwiegley/use-package/][use-package]]:
   + [X] CANCELED Lazy load page text
   + [X] Free previous pages
   + [X] Pre render next page on idle time
-  + [ ] Real multithreaded page loading
+  + [X] Real multithreaded page loading
   + [ ] Synctex
 - [-] Inside Emacs
   + [ ] Sensible page dimensions by default:
