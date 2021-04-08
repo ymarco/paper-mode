@@ -15,8 +15,10 @@ Alternatively, install through [[http://guix.gnu.org][Guix]] with ~guix package 
 With [[https://github.com/jwiegley/use-package/][use-package]]:
 #+begin_src emacs-lisp
 (use-package paper
+  ;; you could also add html, png, jpg
   :mode ("\\.pdf\\'"  . paper-mode)
   :mode ("\\.epub\\'"  . paper-mode)
+  :mode ("\\.cbz\\'"  . paper-mode)
   :config
   (require 'evil-collection-paper)
   (evil-collection-paper-setup))
