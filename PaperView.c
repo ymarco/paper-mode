@@ -54,13 +54,21 @@ void load_page(DocInfo *doci, fz_location location, Page *page) {
             location.page, fz_caught_message(ctx));
   }
   PageRenderCache *cache = &page->cache;
+  cache->rendered.surface = NULL;
   cache->selection.id = 0;
   cache->rendered.id = 0;
   cache->search.id = 0;
 }
 
-int prev_ind_in_page_cache(int i) {
-  return (i + PAGE_CACHE_LEN - 1) % PAGE_CACHE_LEN;
+int prev_ind_in_page_cache(DocInfo *doci, int i) {
+  int new = (i + PAGE_CACHE_LEN - 1) % PAGE_CACHE_LEN;
+  if (doci->page_cache.pages[new].cache.rendered.is_in_progress) {
+    // TODO: will cause infinite loop in case everything is being rendered.
+    // should detect that and wait or something.
+    fprintf(stderr, "progress loop: new=%d\n", new);
+    return prev_ind_in_page_cache(doci, new);
+  }
+  return new;
 }
 
 /*
@@ -73,7 +81,7 @@ Page *get_page(DocInfo *doci, fz_location loc) {
       return &doci->page_cache.pages[i];
     }
   }
-  int new_first = prev_ind_in_page_cache(doci->page_cache.first);
+  int new_first = prev_ind_in_page_cache(doci, doci->page_cache.first);
   Page *res = &doci->page_cache.pages[new_first];
   drop_page(doci->ctx, res);
   load_page(doci, loc, res);
@@ -275,13 +283,58 @@ cairo_surface_t *render_page(fz_context *ctx, DocInfo *doci, Page *page) {
   return surface;
 }
 
-cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci, Page *page) {
+// wraps args to render for passing into g_thread_pool_push
+struct RenderArgs {
+  long unsigned int rendered_id;
+  Page *page;
+  GtkWidget *widget;
+};
+void thread_render(gpointer data, gpointer user_data);
+
+// if page is not available yet, returns NULL gtk_widget_queue_draw would later
+// be called from another thread to update the rendering.
+cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci,
+                                   GtkWidget *widget, Page *page) {
   if (page->cache.rendered.id != doci->rendered_id) {
-    cairo_surface_destroy(page->cache.rendered.surface);
-    page->cache.rendered.surface = render_page(ctx, doci, page);
     page->cache.rendered.id = doci->rendered_id;
+    struct RenderArgs *ra = malloc(sizeof(*ra));
+    ra->page = page;
+    ra->rendered_id = page->cache.rendered.id;
+    ra->widget = widget;
+    page->cache.rendered.is_in_progress = 1;
+    g_thread_pool_push(doci->page_cache.render_pool, ra, NULL);
+    /* thread_render(ra, doci); */
   }
+  if (page->cache.rendered.is_in_progress)
+    return NULL;
   return page->cache.rendered.surface;
+}
+
+// a function with a valid signature for gdk_threads_add_idle
+gboolean widget_queue_draw(void *data) {
+  GtkWidget *widget = data;
+  gtk_widget_queue_draw(widget);
+  return FALSE;
+}
+
+void thread_render(gpointer data, gpointer user_data) {
+  DocInfo *doci = user_data;
+  struct RenderArgs *ra = data;
+  Page *page = ra->page;
+  // mupdf requires one ctx per thread
+  // however, in glib's threadpool we can't associate one for each thread
+  // so a ctx is created on each rendering
+  fz_context *ctx = fz_clone_context(doci->ctx);
+  cairo_surface_t *finished = render_page(ctx, doci, ra->page);
+  fz_drop_context(ctx);
+  if (ra->rendered_id != page->cache.rendered.id) {
+    return; // trust that another thread takes care of it and die in peace
+  }
+  cairo_surface_destroy(page->cache.rendered.surface);
+  page->cache.rendered.surface = finished;
+  page->cache.rendered.is_in_progress = 0;
+  free(ra);
+  gdk_threads_add_idle(widget_queue_draw, ra->widget);
 }
 
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
@@ -302,13 +355,16 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   stopped = fz_transform_point(stopped, scale_ctm);
 
   while (stopped.y < height) {
-    cairo_surface_t *drawn_page = get_rendered_page(ctx, &c->doci, page);
+    cairo_surface_t *drawn_page =
+        get_rendered_page(ctx, &c->doci, widget, page);
     // round to ints to avoid blurriness
     stopped.x = nearbyintf(stopped.x);
     stopped.y = nearbyintf(stopped.y);
     // draw actual page
-    cairo_set_source_surface(cr, drawn_page, stopped.x, stopped.y);
-    cairo_paint(cr);
+    if (drawn_page) {
+      cairo_set_source_surface(cr, drawn_page, stopped.x, stopped.y);
+      cairo_paint(cr);
+    }
     fz_matrix draw_page_ctm =
         fz_concat(scale_ctm, fz_translate(stopped.x, stopped.y));
     // highlight text selection
@@ -332,7 +388,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
       cairo_fill(cr);
     }
 
-    stopped.y += cairo_image_surface_get_height(drawn_page);
+    stopped.y += fz_transform_rect(page->page_bounds, scale_ctm).y1;
     stopped.y += PAGE_SEPARATOR_HEIGHT;
     fz_location next = fz_next_page(ctx, c->doci.doc, loc);
     if (next.chapter == loc.chapter && next.page == loc.page) {
@@ -771,10 +827,26 @@ void set_search(GtkWidget *widget, char *needle) {
   gtk_widget_queue_draw(widget);
 }
 
+void lock_ctx_mutex(void *user, int i) {
+  GMutex *mutexes = user;
+  g_mutex_lock(&mutexes[i]);
+}
+void unlock_ctx_mutex(void *user, int i) {
+  GMutex *mutexes = user;
+  g_mutex_unlock(&mutexes[i]);
+}
+
 int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   // zero it all out - the short way of setting everything to NULL.
   memset(doci, 0, sizeof(*doci));
-  fz_context *ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
+
+  // initialize mutexes
+  memset(doci->ctx_mutexes, 0, sizeof(doci->ctx_mutexes));
+  doci->locks_context.user = doci->ctx_mutexes;
+  doci->locks_context.lock = lock_ctx_mutex;
+  doci->locks_context.unlock = unlock_ctx_mutex;
+  fz_context *ctx =
+      fz_new_context(NULL, &doci->locks_context, FZ_STORE_DEFAULT);
   doci->ctx = ctx;
 
   fz_try(ctx) { fz_register_document_handlers(ctx); }
@@ -811,6 +883,8 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   doci->search_id = 1;
   doci->selection.id = 1;
   doci->rendered_id = 1;
+  doci->page_cache.render_pool = g_thread_pool_new(
+      thread_render, doci, g_get_num_processors(), FALSE, NULL);
   return 1;
 }
 
@@ -845,6 +919,7 @@ static void activate(GtkApplication *app, char *filename) {
 }
 static void paper_view_finalize(GObject *object) {
   PaperViewPrivate *c = paper_view_get_instance_private(PAPER_VIEW(object));
+  g_thread_pool_free(c->doci.page_cache.render_pool, TRUE, TRUE);
   fz_context *ctx = c->doci.ctx;
   for (int i = 0; i < PAGE_CACHE_LEN; i++) {
     drop_page(ctx, &c->doci.page_cache.pages[i]);

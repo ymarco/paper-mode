@@ -24,6 +24,7 @@ typedef struct PageRenderCache {
   struct CachedSurface {
     cairo_surface_t *surface;
     long unsigned int id;
+    char is_in_progress;
   } rendered;
 } PageRenderCache;
 
@@ -60,6 +61,7 @@ typedef struct DocInfo {
   struct PageCache {
     Page pages[PAGE_CACHE_LEN];
     fz_location locs[PAGE_CACHE_LEN];
+    GThreadPool *render_pool;
     int first;
   } page_cache;
   struct Selection {
@@ -78,6 +80,8 @@ typedef struct DocInfo {
   long unsigned int search_id;
   fz_colorspace *colorspace;
   fz_context *ctx;
+  GMutex ctx_mutexes[FZ_LOCK_MAX];
+  fz_locks_context locks_context;
 } DocInfo;
 
 typedef struct _PaperViewPrivate {
