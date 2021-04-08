@@ -293,8 +293,8 @@ void thread_render(gpointer data, gpointer user_data);
 
 // if page is not available yet, returns NULL gtk_widget_queue_draw would later
 // be called from another thread to update the rendering.
-cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci,
-                                   GtkWidget *widget, Page *page) {
+cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
+                                   Page *page) {
   if (page->cache.rendered.id != doci->rendered_id) {
     page->cache.rendered.id = doci->rendered_id;
     struct RenderArgs *ra = malloc(sizeof(*ra));
@@ -355,8 +355,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   stopped = fz_transform_point(stopped, scale_ctm);
 
   while (stopped.y < height) {
-    cairo_surface_t *drawn_page =
-        get_rendered_page(ctx, &c->doci, widget, page);
+    cairo_surface_t *drawn_page = get_rendered_page(&c->doci, widget, page);
     // round to ints to avoid blurriness
     stopped.x = nearbyintf(stopped.x);
     stopped.y = nearbyintf(stopped.y);
