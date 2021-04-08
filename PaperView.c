@@ -276,7 +276,9 @@ void render_page(fz_context *ctx, DocInfo *doci, Page *page) {
   cairo_surface_mark_dirty(page->cache.rendered.surface);
 }
 
-cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci, Page *page) {
+cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci,
+                                   fz_location loc) {
+  Page *page = get_page(doci, loc);
   if (page->cache.rendered.id != doci->rendered_id) {
     render_page(ctx, doci, page);
     page->cache.rendered.id = doci->rendered_id;
@@ -302,7 +304,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   stopped = fz_transform_point(stopped, scale_ctm);
 
   while (stopped.y < height) {
-    cairo_surface_t *drawn_page = get_rendered_page(ctx, &c->doci, page);
+    cairo_surface_t *drawn_page = get_rendered_page(ctx, &c->doci, loc);
     // draw actual page
     // type cast to int to avoid blurriness
     cairo_set_source_surface(cr, drawn_page, (int)stopped.x, (int)stopped.y);
