@@ -247,16 +247,14 @@ void ensure_search_cache_is_updated(fz_context *ctx, DocInfo *doci, Page *page,
 }
 
 // doesn't render selection or search results and such, only raw page
-void render_page(fz_context *ctx, DocInfo *doci, Page *page) {
-  cairo_surface_destroy(page->cache.rendered.surface);
+cairo_surface_t *render_page(fz_context *ctx, DocInfo *doci, Page *page) {
   fz_matrix scale_ctm = get_scale_ctm(doci, page);
   fz_rect float_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
   fz_irect bounds = fz_round_rect(float_bounds);
-  page->cache.rendered.surface =
+  cairo_surface_t *surface =
       cairo_image_surface_create(CAIRO_FORMAT_RGB24, bounds.x1, bounds.y1);
 
-  unsigned char *image =
-      cairo_image_surface_get_data(page->cache.rendered.surface);
+  unsigned char *image = cairo_image_surface_get_data(surface);
   fz_pixmap *pixmap = NULL;
   fz_device *draw_device = NULL;
   fz_try(ctx) {
@@ -273,12 +271,14 @@ void render_page(fz_context *ctx, DocInfo *doci, Page *page) {
   fz_close_device(ctx, draw_device);
   fz_drop_device(ctx, draw_device);
   fz_drop_pixmap(ctx, pixmap);
-  cairo_surface_mark_dirty(page->cache.rendered.surface);
+  cairo_surface_mark_dirty(surface);
+  return surface;
 }
 
 cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci, Page *page) {
   if (page->cache.rendered.id != doci->rendered_id) {
-    render_page(ctx, doci, page);
+    cairo_surface_destroy(page->cache.rendered.surface);
+    page->cache.rendered.surface = render_page(ctx, doci, page);
     page->cache.rendered.id = doci->rendered_id;
   }
   return page->cache.rendered.surface;
