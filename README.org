@@ -36,7 +36,8 @@ With [[https://github.com/jwiegley/use-package/][use-package]]:
       + [X] Follow internal links on click
   + [X] CANCELED Lazy load page text
   + [X] Free previous pages
-  + [ ] Pre render next pages
+  + [X] Pre render next page on idle time
+  + [ ] Real multithreaded page loading
   + [ ] Synctex
 - [-] Inside Emacs
   + [ ] Sensible page dimensions by default:
@@ -62,3 +63,4 @@ With [[https://github.com/jwiegley/use-package/][use-package]]:
   + [ ] Save scrolled document location to restore it on future openings
   + [ ] Figure out if I could map long key presses from Emacs to scroll smoothly
     continously
+  + [ ] Presentation mode
