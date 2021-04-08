@@ -14,7 +14,7 @@ typedef struct CachedQuads {
   Quads quads;
   // global DocInfo IDs and local ones are compared to check if the cache is
   // valid; DocInfo IDs change each time to invalidate all cached results.
-  long unsigned int id;
+  unsigned int id;
 } CachedQuads;
 
 typedef struct PageRenderCache {
@@ -23,7 +23,7 @@ typedef struct PageRenderCache {
   fz_link *highlighted_link;
   struct CachedSurface {
     cairo_surface_t *surface;
-    long unsigned int id;
+    unsigned int id;
     char is_in_progress;
   } rendered;
 } PageRenderCache;
@@ -50,7 +50,7 @@ typedef struct DocInfo {
   pdf_annot *selected_annot;
   float zoom;   // 1.0 means no scaling
   float rotate; // in degrees
-  long unsigned int rendered_id;
+  unsigned int rendered_id;
   /* 0 <= scroll.y <= get_page(doci, doci.location).page_bounds.y1 +
    * PAGE_SEPARATOR_HEIGHT*/
   /* scroll is always relative to current page bounds */
@@ -72,12 +72,12 @@ typedef struct DocInfo {
     fz_location loc_start;
     fz_location loc_end;
     int mode; // FZ_SELECT_(CHARS|WORDS|LINES)
-    long unsigned int id;
+    unsigned int id;
   } selection;
   char filename[PATH_MAX];
   char accel[PATH_MAX];
   char search[PATH_MAX];
-  long unsigned int search_id;
+  unsigned int search_id;
   fz_colorspace *colorspace;
   fz_context *ctx;
   GMutex ctx_mutexes[FZ_LOCK_MAX];

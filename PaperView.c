@@ -285,7 +285,7 @@ cairo_surface_t *render_page(fz_context *ctx, DocInfo *doci, Page *page) {
 
 // wraps args to render for passing into g_thread_pool_push
 struct RenderArgs {
-  long unsigned int rendered_id;
+  unsigned int rendered_id;
   Page *page;
   GtkWidget *widget;
 };
