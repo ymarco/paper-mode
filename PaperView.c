@@ -295,19 +295,20 @@ void thread_render(gpointer data, gpointer user_data);
 // be called from another thread to update the rendering.
 cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
                                     Page *page) {
-  if (page->cache.rendered.id != doci->rendered_id) {
-    page->cache.rendered.id = doci->rendered_id;
+  struct CachedSurface *prc = &page->cache.rendered;
+  if (prc->id != doci->rendered_id) {
+    prc->id = doci->rendered_id;
     struct RenderArgs *ra = malloc(sizeof(*ra));
     ra->page = page;
-    ra->rendered_id = page->cache.rendered.id;
+    ra->rendered_id = prc->id;
     ra->widget = widget;
-    page->cache.rendered.is_in_progress = 1;
+    prc->is_in_progress = 1;
     g_thread_pool_push(doci->page_cache.render_pool, ra, NULL);
     /* thread_render(ra, doci); */
   }
-  if (page->cache.rendered.is_in_progress)
+  if (prc->is_in_progress)
     return NULL;
-  return page->cache.rendered.surface;
+  return prc->surface;
 }
 // a wrapper for get_rendered_page_ that puts close pages in cache
 cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
