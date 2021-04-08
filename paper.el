@@ -95,9 +95,9 @@
 (paper--bind-id paper-scroll-down
                 paper--scroll 0.0 0.1)
 (paper--bind-id paper-scroll-left
-                paper--scroll 0.1 0.0)
-(paper--bind-id paper-scroll-right
                 paper--scroll -0.1 0.0)
+(paper--bind-id paper-scroll-right
+                paper--scroll 0.1 0.0)
 (paper--bind-id paper-scroll-window-up
                 paper--scroll 0.0 -0.5)
 (paper--bind-id paper-scroll-window-down

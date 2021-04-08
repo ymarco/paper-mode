@@ -42,8 +42,8 @@
 
     [remap evil-previous-line] #'paper-scroll-up
     [remap evil-next-line] #'paper-scroll-down
-    [remap evil-forward-char] #'paper-scroll-left
-    [remap evil-backward-char] #'paper-scroll-right
+    [remap evil-forward-char] #'paper-scroll-right
+    [remap evil-backward-char] #'paper-scroll-left
 
     "K" #'paper-scroll-prev-page
     (kbd "C-k") #'paper-scroll-prev-page
