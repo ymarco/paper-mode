@@ -305,9 +305,11 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
 
   while (stopped.y < height) {
     cairo_surface_t *drawn_page = get_rendered_page(ctx, &c->doci, loc);
+    // round to ints to avoid blurriness
+    stopped.x = nearbyintf(stopped.x);
+    stopped.y = nearbyintf(stopped.y);
     // draw actual page
-    // type cast to int to avoid blurriness
-    cairo_set_source_surface(cr, drawn_page, (int)stopped.x, (int)stopped.y);
+    cairo_set_source_surface(cr, drawn_page, stopped.x, stopped.y);
     cairo_paint(cr);
     fz_matrix draw_page_ctm =
         fz_concat(scale_ctm, fz_translate(stopped.x, stopped.y));
