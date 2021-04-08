@@ -275,15 +275,39 @@ void render_page(fz_context *ctx, DocInfo *doci, Page *page) {
   fz_drop_pixmap(ctx, pixmap);
   cairo_surface_mark_dirty(page->cache.rendered.surface);
 }
+// RPD wraps the args for get_rendered_page
+// so it could be used in gdk_threads_add_idle with get_rendered_page_
+struct RenderedPageData {
+  fz_context *ctx;
+  DocInfo *doci;
+  fz_location loc;
+};
 
+gboolean get_rendered_page_(void *data);
 cairo_surface_t *get_rendered_page(fz_context *ctx, DocInfo *doci,
-                                   fz_location loc) {
+                                   fz_location loc, gboolean queue_next) {
   Page *page = get_page(doci, loc);
   if (page->cache.rendered.id != doci->rendered_id) {
     render_page(ctx, doci, page);
     page->cache.rendered.id = doci->rendered_id;
   }
+  if (queue_next) {
+    // render next page in an idle thread. TODO: actually use a thread pool
+    struct RenderedPageData *rpd = malloc(sizeof(struct RenderedPageData));
+    if (rpd) {
+      rpd->ctx = ctx;
+      rpd->doci = doci;
+      rpd->loc = fz_next_page(ctx, doci->doc, loc);
+      gdk_threads_add_idle(get_rendered_page_, rpd);
+    }
+  }
   return page->cache.rendered.surface;
+}
+gboolean get_rendered_page_(void *data) {
+  struct RenderedPageData *rpd = data;
+  get_rendered_page(rpd->ctx, rpd->doci, rpd->loc, FALSE);
+  free(rpd);
+  return FALSE;
 }
 
 gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
@@ -304,7 +328,7 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   stopped = fz_transform_point(stopped, scale_ctm);
 
   while (stopped.y < height) {
-    cairo_surface_t *drawn_page = get_rendered_page(ctx, &c->doci, loc);
+    cairo_surface_t *drawn_page = get_rendered_page(ctx, &c->doci, loc, TRUE);
     // round to ints to avoid blurriness
     stopped.x = nearbyintf(stopped.x);
     stopped.y = nearbyintf(stopped.y);
