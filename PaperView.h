@@ -24,6 +24,8 @@ typedef struct PageRenderCache {
   struct CachedSurface {
     cairo_surface_t *surface;
     unsigned int id;
+    float zoom;
+    float rotate;
     char is_in_progress;
   } rendered;
 } PageRenderCache;

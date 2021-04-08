@@ -294,7 +294,7 @@ void thread_render(gpointer data, gpointer user_data);
 // if page is not available yet, returns NULL gtk_widget_queue_draw would later
 // be called from another thread to update the rendering.
 cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
-                                    Page *page) {
+                                    Page *page, char required) {
   struct CachedSurface *prc = &page->cache.rendered;
   if (prc->id != doci->rendered_id) {
     prc->id = doci->rendered_id;
@@ -303,11 +303,36 @@ cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
     ra->rendered_id = prc->id;
     ra->widget = widget;
     prc->is_in_progress = 1;
+
     g_thread_pool_push(doci->page_cache.render_pool, ra, NULL);
-    /* thread_render(ra, doci); */
+    /* TODO save the amount of time it took to render and if short enough call
+     * thread_render(ra, doci); ourselves instead an approximation */
   }
-  if (prc->is_in_progress)
-    return NULL;
+  if (prc->is_in_progress) {
+    if (required && prc->surface) {
+      // approximate new pixmap by scaling and rotating the old one
+      double z = doci->zoom / prc->zoom;
+      fprintf(stderr, "z: %.2f\n", z);
+      double r = doci->rotate - prc->rotate;
+      fz_matrix scale_ctm = get_scale_ctm(doci, page);
+      fz_rect float_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
+      fz_irect bounds = fz_round_rect(float_bounds);
+      cairo_surface_t *new =
+          cairo_image_surface_create(CAIRO_FORMAT_RGB24, bounds.x1, bounds.y1);
+      cairo_t *cr = cairo_create(new);
+      cairo_scale(cr, z, z);
+      cairo_rotate(cr, r);
+      cairo_set_source_surface(cr, prc->surface, 0, 0);
+      cairo_paint(cr);
+      cairo_destroy(cr);
+      cairo_surface_destroy(prc->surface);
+      prc->zoom = doci->zoom;
+      prc->rotate = doci->rotate;
+      return prc->surface = new;
+    } else {
+      return NULL;
+    }
+  }
   return prc->surface;
 }
 // a wrapper for get_rendered_page_ that puts close pages in cache
@@ -316,11 +341,11 @@ cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
   fz_location loc = {page->page->chapter, page->page->number};
 
   Page *next = get_page(doci, fz_next_page(doci->ctx, doci->doc, loc));
-  get_rendered_page_(doci, widget, next);
+  get_rendered_page_(doci, widget, next, 0);
   Page *prev = get_page(doci, fz_previous_page(doci->ctx, doci->doc, loc));
-  get_rendered_page_(doci, widget, prev);
+  get_rendered_page_(doci, widget, prev, 0);
 
-  return get_rendered_page_(doci, widget, page);
+  return get_rendered_page_(doci, widget, page, 1);
 }
 
 // a function with a valid signature for gdk_threads_add_idle
@@ -343,6 +368,8 @@ void thread_render(gpointer data, gpointer user_data) {
   if (ra->rendered_id != page->cache.rendered.id) {
     return; // trust that another thread takes care of it and die in peace
   }
+  page->cache.rendered.zoom = doci->zoom;
+  page->cache.rendered.rotate = doci->rotate;
   cairo_surface_destroy(page->cache.rendered.surface);
   page->cache.rendered.surface = finished;
   page->cache.rendered.is_in_progress = 0;

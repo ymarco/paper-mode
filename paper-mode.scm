@@ -58,7 +58,9 @@
                     ;; Run make.
                     (lambda* (#:key (make-flags '()) outputs #:allow-other-keys)
                       ;; Compile the shared object file.
-                      (apply invoke "make" "CC=gcc" ; TODO (cc-for-target)
+                      (apply invoke "make"
+                             "CC=gcc"   ; TODO (cc-for-target)
+                             ;; "O_DEBUG=1"
                              make-flags)
                       ;; Move the file into /lib.
                       (install-file
