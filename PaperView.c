@@ -437,14 +437,17 @@ static gboolean update_highlighted_link(GtkWidget *widget,
   trace_point_to_page(widget, &c->doci, mouse_point, &mouse_page_point,
                       &mouse_page_loc);
   Page *page = get_page(&c->doci, mouse_page_loc);
+  fz_matrix ctm = get_scale_ctm(&c->doci, page);
   // skip altogether if point stayed in the same link area as before
   if (page->cache.highlighted_link &&
-      fz_is_point_inside_rect(mouse_page_point,
-                              page->cache.highlighted_link->rect))
+      fz_is_point_inside_rect(
+          mouse_page_point,
+          fz_transform_rect(page->cache.highlighted_link->rect, ctm)))
     return FALSE;
   fz_link *found = NULL;
   for (fz_link *link = page->links; link != NULL; link = link->next) {
-    if (fz_is_point_inside_rect(mouse_page_point, link->rect)) {
+    if (fz_is_point_inside_rect(mouse_page_point,
+                                fz_transform_rect(link->rect, ctm))) {
       found = link;
       cursor = c->click_cursor;
       break;
@@ -672,7 +675,8 @@ void scroll_relatively(GtkWidget *widget, fz_point mult) {
   fz_point scrolled =
       fz_transform_point(fz_make_point(mult.x * w, mult.y * h), scale_ctm_inv);
   scroll(&c->doci, scrolled);
-  // TODO update_highlighted_link: how do we get mouse coordinates?
+  // we could call update_highlighted_link here, but I actually like it when
+  // sole scrolling doesn't highlight things or creates tooltips
 }
 
 void scroll_to_page_start(GtkWidget *widget) {
