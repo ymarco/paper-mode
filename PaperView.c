@@ -11,6 +11,9 @@ const int PAGE_SEPARATOR_HEIGHT = 18;
 // refuse more than 6x zoom; it can lead to the process being killed, I
 // assume OOM?
 #define MAX_ZOOM 6
+// don't approximate zoom above this level; approximation often takes longer
+#define MAX_APPROXIMATE_ZOOM 2
+
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
 int locationcmp(fz_location a, fz_location b) {
@@ -305,9 +308,13 @@ cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
     ra->page = page;
     ra->rendered_id = prc->id;
     ra->widget = widget;
-    prc->is_in_progress = 1;
 
-    g_thread_pool_push(doci->page_cache.render_pool, ra, NULL);
+    if (required && doci->zoom > MAX_APPROXIMATE_ZOOM)
+      thread_render(ra, doci);
+    else {
+      prc->is_in_progress = 1;
+      g_thread_pool_push(doci->page_cache.render_pool, ra, NULL);
+    }
     /* TODO save the amount of time it took to render and if short enough call
      * thread_render(ra, doci); ourselves instead an approximation */
   }
@@ -343,11 +350,13 @@ cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
                                    Page *page) {
   fz_location loc = {page->page->chapter, page->page->number};
 
-  Page *next = get_page(doci, fz_next_page(doci->ctx, doci->doc, loc));
-  get_rendered_page_(doci, widget, next, 0);
-  Page *prev = get_page(doci, fz_previous_page(doci->ctx, doci->doc, loc));
-  get_rendered_page_(doci, widget, prev, 0);
-
+  // try not to OOM on large zoom
+  if (doci->zoom < MAX_APPROXIMATE_ZOOM) {
+    Page *next = get_page(doci, fz_next_page(doci->ctx, doci->doc, loc));
+    get_rendered_page_(doci, widget, next, 0);
+    Page *prev = get_page(doci, fz_previous_page(doci->ctx, doci->doc, loc));
+    get_rendered_page_(doci, widget, prev, 0);
+  }
   return get_rendered_page_(doci, widget, page, 1);
 }
 
