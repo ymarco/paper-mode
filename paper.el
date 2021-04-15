@@ -191,7 +191,7 @@ Similar to `mouse-wheel-text-scale' but for paper-mode."
     (define-key map [remap right-char] #'paper-scroll-right)
     (define-key map [remap left-char] #'paper-scroll-left)
     (define-key map [remap scroll-up-command] #'paper-scroll-window-up)
-    (define-key map [remap scroll-down-command] #'paper-scroll-window-up)
+    (define-key map [remap scroll-down-command] #'paper-scroll-window-down)
     (define-key map [remap mwheel-scroll] #'paper-mwheel-scroll)
     (define-key map [remap mouse-wheel-text-scale] #'paper-mouse-wheel-text-scale)
     map)
