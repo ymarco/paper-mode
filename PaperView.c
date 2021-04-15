@@ -8,6 +8,9 @@
 
 const int PAGE_SEPARATOR_HEIGHT = 18;
 
+// refuse more than 6x zoom; it can lead to the process being killed, I
+// assume OOM?
+#define MAX_ZOOM 6
 G_DEFINE_TYPE_WITH_PRIVATE(PaperView, paper_view, GTK_TYPE_DRAWING_AREA);
 
 int locationcmp(fz_location a, fz_location b) {
@@ -686,6 +689,9 @@ static void scroll(DocInfo *doci, fz_point delta) {
 }
 
 static void change_zoom(DocInfo *doci, float new_zoom) {
+  if (new_zoom > MAX_ZOOM) {
+    new_zoom = MAX_ZOOM;
+  }
   if (doci->zoom == new_zoom)
     return;
   doci->zoom = new_zoom;
