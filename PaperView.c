@@ -297,10 +297,10 @@ struct RenderArgs {
 };
 void thread_render(gpointer data, gpointer user_data);
 
-// if page is not available yet, returns NULL gtk_widget_queue_draw would later
-// be called from another thread to update the rendering.
+// if page is not available yet, returns NULL and gtk_widget_queue_draw would
+// later be called from another thread to update the rendering.
 cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
-                                    Page *page, char required) {
+                                    Page *page) {
   struct CachedSurface *prc = &page->cache.rendered;
   if (prc->id != doci->rendered_id) {
     prc->id = doci->rendered_id;
@@ -309,9 +309,10 @@ cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
     ra->rendered_id = prc->id;
     ra->widget = widget;
 
-    if (required && doci->zoom > MAX_APPROXIMATE_ZOOM)
+    if (doci->zoom > MAX_APPROXIMATE_ZOOM) {
+      // render in this thread instead of using thread pool
       thread_render(ra, doci);
-    else {
+    } else {
       prc->is_in_progress = 1;
       g_thread_pool_push(doci->page_cache.render_pool, ra, NULL);
     }
@@ -319,45 +320,51 @@ cairo_surface_t *get_rendered_page_(DocInfo *doci, GtkWidget *widget,
      * thread_render(ra, doci); ourselves instead an approximation */
   }
   if (prc->is_in_progress) {
-    if (required && prc->surface) {
-      // approximate new pixmap by scaling and rotating the old one
-      double z = doci->zoom / prc->zoom;
-      fprintf(stderr, "z: %.2f\n", z);
-      double r = doci->rotate - prc->rotate;
-      fz_matrix scale_ctm = get_scale_ctm(doci, page);
-      fz_rect float_bounds = fz_transform_rect(page->page_bounds, scale_ctm);
-      fz_irect bounds = fz_round_rect(float_bounds);
-      cairo_surface_t *new =
-          cairo_image_surface_create(CAIRO_FORMAT_RGB24, bounds.x1, bounds.y1);
-      cairo_t *cr = cairo_create(new);
-      cairo_scale(cr, z, z);
-      cairo_rotate(cr, r);
-      cairo_set_source_surface(cr, prc->surface, 0, 0);
-      cairo_paint(cr);
-      cairo_destroy(cr);
-      cairo_surface_destroy(prc->surface);
-      prc->zoom = doci->zoom;
-      prc->rotate = doci->rotate;
-      return prc->surface = new;
-    } else {
-      return NULL;
-    }
+    return NULL;
   }
   return prc->surface;
 }
-// a wrapper for get_rendered_page_ that puts close pages in cache
-cairo_surface_t *get_rendered_page(DocInfo *doci, GtkWidget *widget,
-                                   Page *page) {
+/*
+ * Draw page.
+ * cr: the surface to draw on
+ * translation: x,y position to offset the drawing on
+ *
+ * This is a wrapper around get_rendered_page_ that pre-renders next and
+ * previous pages, and uses an approximation for the drawn page if a full-res
+ * version is not avaliable yet.
+ */
+void draw_page_pixmap(cairo_t *cr, fz_point translation, DocInfo *doci,
+                      GtkWidget *widget, Page *page) {
   fz_location loc = {page->page->chapter, page->page->number};
 
   // try not to OOM on large zoom
   if (doci->zoom < MAX_APPROXIMATE_ZOOM) {
     Page *next = get_page(doci, fz_next_page(doci->ctx, doci->doc, loc));
-    get_rendered_page_(doci, widget, next, 0);
+    get_rendered_page_(doci, widget, next);
     Page *prev = get_page(doci, fz_previous_page(doci->ctx, doci->doc, loc));
-    get_rendered_page_(doci, widget, prev, 0);
+    get_rendered_page_(doci, widget, prev);
   }
-  return get_rendered_page_(doci, widget, page, 1);
+
+  cairo_surface_t *surface = get_rendered_page_(doci, widget, page);
+
+  struct CachedSurface *prc = &page->cache.rendered;
+  if (surface) {
+    cairo_set_source_surface(cr, surface, translation.x, translation.y);
+    cairo_paint(cr);
+  } else if (prc->surface) {
+    // approximate new pixmap by scaling and rotating the old one
+    double z = doci->zoom / prc->zoom;
+    fprintf(stderr, "z: %.2f\n", z);
+    double r = doci->rotate - prc->rotate;
+    cairo_save(cr);
+    cairo_scale(cr, z, z);
+    cairo_rotate(cr, r);
+    fz_point inv_trans = fz_transform_point(
+        translation, fz_invert_matrix(get_scale_ctm(doci, page)));
+    cairo_set_source_surface(cr, prc->surface, inv_trans.x, inv_trans.y);
+    cairo_paint(cr);
+    cairo_restore(cr);
+  }
 }
 
 // a function with a valid signature for gdk_threads_add_idle
@@ -407,15 +414,11 @@ gboolean draw_callback(GtkWidget *widget, cairo_t *cr) {
   stopped = fz_transform_point(stopped, scale_ctm);
 
   while (stopped.y < height) {
-    cairo_surface_t *drawn_page = get_rendered_page(&c->doci, widget, page);
     // round to ints to avoid blurriness
     stopped.x = nearbyintf(stopped.x);
     stopped.y = nearbyintf(stopped.y);
     // draw actual page
-    if (drawn_page) {
-      cairo_set_source_surface(cr, drawn_page, stopped.x, stopped.y);
-      cairo_paint(cr);
-    }
+    draw_page_pixmap(cr, stopped, &c->doci, widget, page);
     fz_matrix draw_page_ctm =
         fz_concat(scale_ctm, fz_translate(stopped.x, stopped.y));
     // highlight text selection
