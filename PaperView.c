@@ -898,7 +898,9 @@ int load_doc(DocInfo *doci, char *filename, char *accel_filename) {
   memset(doci, 0, sizeof(*doci));
 
   // initialize mutexes
-  memset(doci->ctx_mutexes, 0, sizeof(doci->ctx_mutexes));
+  for (int i = 0; i < FZ_LOCK_MAX; i++) {
+    g_mutex_init(&doci->ctx_mutexes[i]);
+  }
   doci->locks_context.user = doci->ctx_mutexes;
   doci->locks_context.lock = lock_ctx_mutex;
   doci->locks_context.unlock = unlock_ctx_mutex;
