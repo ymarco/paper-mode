@@ -3,15 +3,12 @@
 
 #include "PaperView.h"
 #include "emacs-module.h"
+#include "symbols.h"
 #include <gtk/gtk.h>
 
 #define UNUSED(x) (void)(x)
 
 
-emacs_value Qnil;
-emacs_value Qargs_out_of_range;
-emacs_value Qfset;
-emacs_value Qprovide;
 
 
 typedef struct Client {

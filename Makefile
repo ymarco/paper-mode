@@ -18,10 +18,12 @@ ifeq ($(O_RELEASE),1)
 endif
 
 
-paper-module.so: paper-module.o PaperView.o
+paper-module.so: paper-module.o PaperView.o symbols.o
 	$(CC) $(CFLAGS) -shared $(LDFLAGS) -o $@ $^
 
 paper-module.o: PaperView.h from-webkit.h emacs-module.h
+symbols.o: CFLAGS += -fvisibility=hidden
+symbols.o: symbols.h
 
 PaperView.o: PaperView.h PaperView.c
 
