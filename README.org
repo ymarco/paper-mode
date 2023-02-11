@@ -1,5 +1,8 @@
 #+TITLE:   Paper Mode
 
+*Project status: abandoned due to linking problems with mupdf*
+
+
 Experimental PDF viewer for Emacs, rendering with mupdf and using gtk directly
 on an Emacs window from a dynamic module - the method invented by [[https://github.com/akirakyle/emacs-webkit][emcas-webkit]].
 
